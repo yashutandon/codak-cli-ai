@@ -1,9 +1,15 @@
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { useKeyboard } from "@opentui/react"
 import type { InputRenderable, KeyBinding } from "@opentui/core"
 
 import { StatusBar, type StatusBarProps } from "./status-bar"
 import { EmptyBorder } from "../common/border"
+import { CommandMenu } from "../command-menu"
+
+import type { TextareaRenderable, ContentChangeEvent } from "@opentui/core"
+import { useRenderer } from "@opentui/react"
+import type { Command } from "../command-menu/types/command.types"
+import { useCommandMenu } from "../command-menu/hooks/use-command-menu"
 
 export type InputBarProps = {
     onSubmit: (text: string) => void
@@ -20,6 +26,92 @@ export function InputBar({
     const [focused, setFocused] = useState(true)
 
     const inputRef = useRef<InputRenderable>(null)
+    const textareaRef = useRef<TextareaRenderable>(null)
+    const onSubmitRef = useRef<() => void>(() => { })
+    const renderer = useRenderer()
+    const {
+        showCommandMenu,
+        commandQuery,
+        scrollRef,
+        selectedIndex,
+        handleContentChange,
+        resolveCommand,
+        closeMenu,
+        setSelectedIndex,
+    } = useCommandMenu()
+
+    // FIX: handleCommand is defined BEFORE anything that calls it.
+    // Previously it was defined after handleCommandExecute, so
+    // handleCommandExecute captured it as undefined in its closure.
+    const handleCommand = useCallback((command: Command | undefined) => {
+        const textarea = textareaRef.current
+        if (!command || !textarea) return
+        textarea.setText("")
+        if (command.action) {
+            command.action({
+                exit: () => {
+                    renderer.destroy()
+                }
+            })
+        } else {
+            textarea.insertText(command.value + "")
+        }
+    }, [renderer])
+
+    const handleSelectByCommand = useCallback((_command: string) => {
+        // selectedIndex is managed by useCommandMenu
+    }, [])
+
+    // FIX: handleCommandExecute now has handleCommand in its deps,
+    // and calls closeMenu() explicitly so the menu hides immediately
+    // without a race between resolveCommand's setState and this handler.
+    const handleCommandExecute = useCallback((_command: string) => {
+        const resolved = resolveCommand(selectedIndex)
+        if (resolved) {
+            closeMenu()
+            handleCommand(resolved)
+        }
+    }, [selectedIndex, resolveCommand, closeMenu, handleCommand])
+
+    const handleTextAreaChange = useCallback((event: ContentChangeEvent) => {
+        const textarea = textareaRef.current
+        if (!textarea) return
+        handleContentChange(textarea.plainText)
+    }, [handleContentChange])
+
+    const handleSubmit = useCallback(() => {
+        if (disabled) return
+        const textarea = textareaRef.current
+        if (!textarea) return
+        const text = textarea.plainText.trim()
+        if (text.length === 0) return
+        onSubmit(text)
+        textarea.setText("")
+    }, [disabled, onSubmit])
+
+    useEffect(() => {
+        const textarea = textareaRef.current
+        if (!textarea) return
+        textarea.onSubmit = () => {
+            onSubmitRef.current()
+        }
+    }, [])
+
+    // FIX: onSubmitRef pattern already avoids stale closures here — good.
+    // Also calls closeMenu() explicitly before handleCommand, same fix as above.
+    onSubmitRef.current = () => {
+        if (disabled) return
+
+        if (showCommandMenu) {
+            const command = resolveCommand(selectedIndex)
+            if (command) {
+                closeMenu()
+                handleCommand(command)
+            }
+            return
+        }
+        handleSubmit()
+    }
 
     const stateRef = useRef({
         value,
@@ -75,43 +167,29 @@ export function InputBar({
     }, [clearInput])
 
     const TEXTAREA_KEYBOARD_SHORTCUTS: KeyBinding[] = [
-        {
-            name: "return",
-            action: "submit",
-        },
-        {
-            name: "enter",
-            action: "submit",
-        },
-        {
-            name: "return",
-            shift: true,
-            action: "newline",
-        },
-        {
-            name: "enter",
-            shift: true,
-            action: "newline",
-        },
+        { name: "return", action: "submit" },
+        { name: "enter", action: "submit" },
+        { name: "return", shift: true, action: "newline" },
+        { name: "enter", shift: true, action: "newline" },
     ]
 
     const borderColor = disabled
         ? "#2A2A3A"
         : focused
-          ? "#4A9EFF"
-          : "#3A3A4A"
+            ? "#4A9EFF"
+            : "#3A3A4A"
 
     const promptColor = disabled
         ? "#2A2A3A"
         : focused
-          ? "#4A9EFF"
-          : "#555577"
+            ? "#4A9EFF"
+            : "#555577"
 
     const hintColor = disabled
         ? "#2A2A3A"
         : value.trim()
-          ? "#4A9EFF"
-          : "#333344"
+            ? "#4A9EFF"
+            : "#333344"
 
     return (
         <box
@@ -146,9 +224,26 @@ export function InputBar({
                     <text fg={promptColor}>
                         {disabled ? "✖ " : "› "}
                     </text>
-
+                    {showCommandMenu && (
+                        <box
+                            position="absolute"
+                            left={0}
+                            bottom="100%"
+                            width="100%"
+                            backgroundColor="#4A9EFF22"
+                            zIndex={10}
+                        >
+                            <CommandMenu
+                                query={commandQuery}
+                                selectedIndex={selectedIndex}
+                                containerRef={scrollRef}
+                                onSelect={handleSelectByCommand}
+                                onExecute={handleCommandExecute}
+                            />
+                        </box>
+                    )}
                     <textarea
-                        ref={inputRef}
+                        ref={textareaRef}
                         flexGrow={1}
                         flexShrink={1}
                         initialValue=""
@@ -167,11 +262,7 @@ export function InputBar({
                         }
                         cursorColor="#4A9EFF"
                         focused={!disabled && focused}
-                        onContentChange={() => {
-                            setValue(
-                                inputRef.current?.plainText ?? ""
-                            )
-                        }}
+                        onContentChange={handleTextAreaChange}
                         onSubmit={handleInputSubmit}
                     />
 
@@ -179,8 +270,8 @@ export function InputBar({
                         {disabled
                             ? ""
                             : value.trim().length > 0
-                              ? " ↵"
-                              : "esc to cancel"}
+                                ? " ↵"
+                                : "esc to cancel"}
                     </text>
                 </box>
             </box>
