@@ -10,6 +10,9 @@ import type { TextareaRenderable, ContentChangeEvent } from "@opentui/core"
 import { useRenderer } from "@opentui/react"
 import type { Command } from "../command-menu/types/command.types"
 import { useCommandMenu } from "../command-menu/hooks/use-command-menu"
+import {useToast} from "../../providers/toast"
+import { useKeyboardLayer } from "../../providers/keyboard-layers"
+import { useDialog } from "../../providers/dialog"
 
 export type InputBarProps = {
     onSubmit: (text: string) => void
@@ -40,6 +43,10 @@ export function InputBar({
         setSelectedIndex,
     } = useCommandMenu()
 
+    const toast = useToast()
+    const {isTopLayer,setResponder}=useKeyboardLayer();
+    const dialog=useDialog();
+
     // FIX: handleCommand is defined BEFORE anything that calls it.
     // Previously it was defined after handleCommandExecute, so
     // handleCommandExecute captured it as undefined in its closure.
@@ -51,12 +58,14 @@ export function InputBar({
             command.action({
                 exit: () => {
                     renderer.destroy()
-                }
+                },
+                toast,
+                dialog
             })
         } else {
             textarea.insertText(command.value + "")
         }
-    }, [renderer])
+    }, [renderer, toast])
 
     const handleSelectByCommand = useCallback((_command: string) => {
         // selectedIndex is managed by useCommandMenu
@@ -191,6 +200,20 @@ export function InputBar({
             ? "#4A9EFF"
             : "#333344"
 
+
+    useEffect(()=>{
+        setResponder("base",()=>{
+            if(disabled) return false;
+        const textarea=textareaRef.current;
+        if(textarea && textarea.plainText.length>0){
+            textarea.setText("");
+            return true;
+        }
+        return false
+        })
+        return ()=>setResponder("base",null);
+    },[disabled,setResponder])
+
     return (
         <box
             border={["left"]}
@@ -261,7 +284,7 @@ export function InputBar({
                                 : "#E0E0F0"
                         }
                         cursorColor="#4A9EFF"
-                        focused={!disabled && focused}
+                        focused={!disabled && focused && (isTopLayer("base")|| isTopLayer("command"))}
                         onContentChange={handleTextAreaChange}
                         onSubmit={handleInputSubmit}
                     />
