@@ -4,6 +4,8 @@ import type { ScrollBoxRenderable } from "@opentui/core"
 import type { Command } from "../../command-menu/types/command.types"
 import { useKeyboard } from "@opentui/react"
 
+import { useKeyboardLayer } from "../../../providers/keyboard-layers"
+
 type UseCommandMenuReturn = {
     showCommandMenu: boolean
     commandQuery: string
@@ -22,6 +24,8 @@ export const useCommandMenu = (): UseCommandMenuReturn => {
     const [textValue, setTextValue] = useState("")
     const [selectedIndex, setSelectedIndex] = useState(0)
     const scrollRef = useRef<ScrollBoxRenderable | null>(null)
+
+    const {push,pop,isTopLayer}=useKeyboardLayer()
 
     const commandQuery = showCommandMenu && textValue.startsWith("@") ? textValue.slice(1) : ""
 
@@ -44,8 +48,14 @@ export const useCommandMenu = (): UseCommandMenuReturn => {
         const prefix = text.startsWith("@") ? text.slice(1) : null
         if (prefix != null && !prefix.includes(" ")) {
             setShowCommandMenu(true)
+            push("command",()=>{
+                setShowCommandMenu(false);
+                pop("command")
+                return true;
+            })
         } else {
             setShowCommandMenu(false)
+            pop("command")
         }
     }
 
@@ -59,13 +69,15 @@ export const useCommandMenu = (): UseCommandMenuReturn => {
     // so there's no async state race between resolving and acting on the command.
     const resolveCommand = (index: number): Command | null => {
         return filteredCommandsRef.current[index] ?? null
+
     }
 
     useKeyboard((key) => {
-        if (!showCommandMenu) return
+        if (!showCommandMenu || !isTopLayer("command")) return
 
         if (key.name === "escape") {
             key.preventDefault()
+            pop("command")
             closeMenu()
             return
         }

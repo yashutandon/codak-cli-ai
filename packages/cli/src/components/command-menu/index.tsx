@@ -4,6 +4,7 @@ import { filterCommands } from "./filter-commands"
 import { TextAttributes, type ScrollBoxRenderable } from "@opentui/core"
 
 
+
 const MAX_VISIBLE_COMMANDS = 8;
 
 const COMMAND_COL_WIDTH = Math.max(...COMMANDS.map(cmd => cmd.name.length)) + 4
