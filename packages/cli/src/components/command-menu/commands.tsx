@@ -1,3 +1,4 @@
+import { ThemeDialogContent } from "../theme/theme-dialog";
 import type { Command } from "./types/command.types";
 
 export const COMMANDS: Command[] = [
@@ -99,37 +100,16 @@ export const COMMANDS: Command[] = [
     },
 
     // Theme Commands
+  
     {
-        name: "Dark Theme",
-        description: "Switch to dark mode",
-        value: "@theme-dark",
+        name: "Theme",
+        description: "Change colpr theme",
+        value: "@theme",
         action: (ctx) => {
-            ctx.toast.show({
-                message: "Switched to dark theme!",
-                variant: "success",
-            });
-        }
-    },
-    {
-        name: "Light Theme",
-        description: "Switch to light mode",
-        value: "@theme-light",
-        action: (ctx) => {
-            ctx.toast.show({
-                message: "Switched to light theme!",
-                variant: "success",
-            });
-        }
-    },
-    {
-        name: "System Theme",
-        description: "Use system theme",
-        value: "@theme-system",
-        action: (ctx) => {
-            ctx.toast.show({
-                message: "Using system theme!",
-                variant: "info",
-            });
+           ctx.dialog.open({
+            title:"Select Theme",
+            children:<ThemeDialogContent/>
+           })
         }
     },
 

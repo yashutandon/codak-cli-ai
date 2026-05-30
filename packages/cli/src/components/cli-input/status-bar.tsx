@@ -2,6 +2,7 @@
 
 import { TextAttributes } from "@opentui/core"
 import { getAppSlot } from "../../helpers/slot-registry"
+import { useTheme } from "../../providers/theme"
 
 export type StatusBarProps = {
   model?: string
@@ -13,6 +14,7 @@ export function StatusBar({
   interactionMode = "Build",
 }: StatusBarProps) {
   const AppSlot = getAppSlot()
+  const {colors}=useTheme();
 
   return (
     <box
@@ -46,15 +48,16 @@ function DefaultStatusLeft({
   model,
   interactionMode,
 }: Required<StatusBarProps>) {
+  const {colors}=useTheme();
   return (
     <box flexDirection="row" gap={1} alignItems="center">
-      <text fg="cyan" attributes={TextAttributes.BOLD}>
+      <text fg={colors.primary} attributes={TextAttributes.BOLD}>
         {interactionMode}
       </text>
       <text attributes={TextAttributes.DIM} fg="gray">
         &gt;
       </text>
-      <text fg="#E0E0F0">{model}</text>
+      <text fg={colors.selection}>{model}</text>
     </box>
   )
 }
