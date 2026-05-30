@@ -13,6 +13,7 @@ import { useCommandMenu } from "../command-menu/hooks/use-command-menu"
 import {useToast} from "../../providers/toast"
 import { useKeyboardLayer } from "../../providers/keyboard-layers"
 import { useDialog } from "../../providers/dialog"
+import { useTheme } from "../../providers/theme"
 
 export type InputBarProps = {
     onSubmit: (text: string) => void
@@ -46,6 +47,9 @@ export function InputBar({
     const toast = useToast()
     const {isTopLayer,setResponder}=useKeyboardLayer();
     const dialog=useDialog();
+
+     const {colors}=useTheme();
+    
 
     // FIX: handleCommand is defined BEFORE anything that calls it.
     // Previously it was defined after handleCommandExecute, so
@@ -226,8 +230,8 @@ export function InputBar({
             alignItems="center"
             width="100%"
             flexShrink={0}
-            borderColor={borderColor}
-            backgroundColor="#1A1A24"
+            borderColor={colors.primary}
+            backgroundColor={colors.surface}
             minHeight={5}
         >
             <StatusBar {...statusBar} />
@@ -253,7 +257,7 @@ export function InputBar({
                             left={0}
                             bottom="100%"
                             width="100%"
-                            backgroundColor="#4A9EFF22"
+                            backgroundColor={colors.surface}
                             zIndex={10}
                         >
                             <CommandMenu

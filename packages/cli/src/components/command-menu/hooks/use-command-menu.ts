@@ -59,8 +59,10 @@ export const useCommandMenu = (): UseCommandMenuReturn => {
         }
     }
 
+
     const closeMenu = () => {
         setShowCommandMenu(false)
+        pop("command")
         setSelectedIndex(0)
     }
 
@@ -77,6 +79,7 @@ export const useCommandMenu = (): UseCommandMenuReturn => {
 
         if (key.name === "escape") {
             key.preventDefault()
+            
             pop("command")
             closeMenu()
             return
