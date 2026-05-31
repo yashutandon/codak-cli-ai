@@ -1,15 +1,15 @@
-import {createContext, useContext, useState,useRef,useCallback} from "react";
+import { createContext, useContext, useState, useRef, useCallback } from "react";
 
 import type { ReactNode } from "react";
-import type { ToastOptions,ToastVarient } from "./types/types";
+import type { ToastOptions, ToastVarient } from "./types/types";
 import { DEFAULT_TOAST_DURATION } from "./types/types";
-import {useTerminalDimensions} from "@opentui/react"
+import { useTerminalDimensions } from "@opentui/react"
 import { SplitBorder } from "../../components/common/border";
+import { useTheme } from "../theme";
 
 
 export type ToastContextValue = {
-   show: (options: ToastOptions) => void
-
+    show: (options: ToastOptions) => void
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null)
@@ -29,10 +29,9 @@ type ToastProviderProps = {
 export function ToastProvider({ children }: ToastProviderProps) {
     const [currentToast, setCurrentToast] = useState<ToastOptions | null>(null)
     const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-  
 
     const clearcurrentTimeout = useCallback(() => {
-        if(timeoutRef.current) {
+        if (timeoutRef.current) {
             clearTimeout(timeoutRef.current)
             timeoutRef.current = null
         }
@@ -40,12 +39,12 @@ export function ToastProvider({ children }: ToastProviderProps) {
 
     const show = useCallback((options: ToastOptions) => {
         const duration = options.duration ?? DEFAULT_TOAST_DURATION
-        
+
         clearcurrentTimeout()
         setCurrentToast({
-            variant:options.variant ?? "info",
+            variant: options.variant ?? "info",
             ...options,
-            duration
+            duration,
         })
         timeoutRef.current = setTimeout(() => {
             setCurrentToast(null)
@@ -53,13 +52,12 @@ export function ToastProvider({ children }: ToastProviderProps) {
         }, duration).unref()
     }, [clearcurrentTimeout])
 
-    const value:ToastContextValue = {
-        show
-    }
+    const value: ToastContextValue = { show }
+
     return (
         <ToastContext.Provider value={value}>
             {children}
-            <Toast currentToast={currentToast}/>
+            <Toast currentToast={currentToast} />
         </ToastContext.Provider>
     )
 }
@@ -70,39 +68,43 @@ type ToastProps = {
 
 function Toast({ currentToast }: ToastProps) {
     const { width } = useTerminalDimensions()
+    const { colors } = useTheme()
+
     if (!currentToast) return null
 
     const variantColors: Record<ToastVarient, string> = {
-        success: "green",
-        error: "red",
-        info: "blue",
-        warning: "yellow",
+        success: colors.success,
+        error:   colors.error,
+        info:    colors.info,
+        warning: colors.planMode,   
     }
 
-    const borderColor= currentToast.variant ? variantColors[currentToast.variant] : variantColors.info
-    
+    const borderColor = currentToast.variant
+        ? variantColors[currentToast.variant]
+        : variantColors.info
+
     return (
         <box
             position="absolute"
             justifyContent="flex-start"
             alignItems="flex-start"
-            width={Math.max(1,Math.min(60, width - 6))}
+            width={Math.max(1, Math.min(60, width - 6))}
             top={2}
             left={2}
             paddingLeft={2}
             paddingRight={2}
             paddingTop={1}
             paddingBottom={1}
-            backgroundColor="#0c0c12"
+            backgroundColor={colors.dialogSurface}
             borderColor={borderColor}
-            border={["left","right"]}
-            customBorderChars={SplitBorder}>
-                <box flexDirection="column" gap={1} width="100%">
-                    <text fg="white" wrapMode="word" width="100%">
-                        {currentToast.message}
-                    </text>
-                </box>
-            
+            border={["left", "right"]}
+            customBorderChars={SplitBorder}
+        >
+            <box flexDirection="column" gap={1} width="100%">
+                <text fg={colors.thinking} wrapMode="word" width="100%">
+                    {currentToast.message}
+                </text>
+            </box>
         </box>
     )
 }

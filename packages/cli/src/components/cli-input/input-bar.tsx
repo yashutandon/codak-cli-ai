@@ -10,7 +10,7 @@ import type { TextareaRenderable, ContentChangeEvent } from "@opentui/core"
 import { useRenderer } from "@opentui/react"
 import type { Command } from "../command-menu/types/command.types"
 import { useCommandMenu } from "../command-menu/hooks/use-command-menu"
-import {useToast} from "../../providers/toast"
+import { useToast } from "../../providers/toast"
 import { useKeyboardLayer } from "../../providers/keyboard-layers"
 import { useDialog } from "../../providers/dialog"
 import { useTheme } from "../../providers/theme"
@@ -45,15 +45,10 @@ export function InputBar({
     } = useCommandMenu()
 
     const toast = useToast()
-    const {isTopLayer,setResponder}=useKeyboardLayer();
-    const dialog=useDialog();
+    const { isTopLayer, setResponder } = useKeyboardLayer()
+    const dialog = useDialog()
+    const { colors } = useTheme()
 
-     const {colors}=useTheme();
-    
-
-    // FIX: handleCommand is defined BEFORE anything that calls it.
-    // Previously it was defined after handleCommandExecute, so
-    // handleCommandExecute captured it as undefined in its closure.
     const handleCommand = useCallback((command: Command | undefined) => {
         const textarea = textareaRef.current
         if (!command || !textarea) return
@@ -64,20 +59,17 @@ export function InputBar({
                     renderer.destroy()
                 },
                 toast,
-                dialog
+                dialog,
             })
         } else {
             textarea.insertText(command.value + "")
         }
-    }, [renderer, toast])
+    }, [renderer, toast, dialog])
 
     const handleSelectByCommand = useCallback((_command: string) => {
         // selectedIndex is managed by useCommandMenu
     }, [])
 
-    // FIX: handleCommandExecute now has handleCommand in its deps,
-    // and calls closeMenu() explicitly so the menu hides immediately
-    // without a race between resolveCommand's setState and this handler.
     const handleCommandExecute = useCallback((_command: string) => {
         const resolved = resolveCommand(selectedIndex)
         if (resolved) {
@@ -110,11 +102,8 @@ export function InputBar({
         }
     }, [])
 
-    // FIX: onSubmitRef pattern already avoids stale closures here — good.
-    // Also calls closeMenu() explicitly before handleCommand, same fix as above.
     onSubmitRef.current = () => {
         if (disabled) return
-
         if (showCommandMenu) {
             const command = resolveCommand(selectedIndex)
             if (command) {
@@ -126,36 +115,19 @@ export function InputBar({
         handleSubmit()
     }
 
-    const stateRef = useRef({
-        value,
-        focused,
-        disabled,
-        onSubmit,
-    })
-
-    stateRef.current = {
-        value,
-        focused,
-        disabled,
-        onSubmit,
-    }
+    const stateRef = useRef({ value, focused, disabled, onSubmit })
+    stateRef.current = { value, focused, disabled, onSubmit }
 
     useKeyboard((key) => {
         const { disabled, focused } = stateRef.current
-
         if (disabled) return
-
         if (key.name === "escape") {
             inputRef.current?.clear?.()
             setValue("")
             setFocused(false)
             return
         }
-
-        if (
-            (key.name === "enter" || key.name === "return") &&
-            !focused
-        ) {
+        if ((key.name === "enter" || key.name === "return") && !focused) {
             setFocused(true)
         }
     })
@@ -167,15 +139,10 @@ export function InputBar({
 
     const handleInputSubmit = useCallback(() => {
         const { disabled, onSubmit } = stateRef.current
-
         if (disabled) return
-
         const text = inputRef.current?.plainText ?? ""
-
         if (!text.trim()) return
-
         onSubmit(text.trim())
-
         clearInput()
     }, [clearInput])
 
@@ -186,37 +153,43 @@ export function InputBar({
         { name: "enter", shift: true, action: "newline" },
     ]
 
+    // ── Theme-aware colors ────────────────────────────────────────
     const borderColor = disabled
-        ? "#2A2A3A"
+        ? colors.dimSeparator
         : focused
-            ? "#4A9EFF"
-            : "#3A3A4A"
+            ? colors.primary
+            : colors.selection
 
     const promptColor = disabled
-        ? "#2A2A3A"
+        ? colors.dimSeparator
         : focused
-            ? "#4A9EFF"
-            : "#555577"
+            ? colors.primary
+            : colors.dimSeparator
 
     const hintColor = disabled
-        ? "#2A2A3A"
+        ? colors.dimSeparator
         : value.trim()
-            ? "#4A9EFF"
-            : "#333344"
+            ? colors.primary
+            : colors.selection
 
+    const textColor = disabled
+        ? colors.dimSeparator
+        : colors.thinking   // bright but neutral — good for input text
 
-    useEffect(()=>{
-        setResponder("base",()=>{
-            if(disabled) return false;
-        const textarea=textareaRef.current;
-        if(textarea && textarea.plainText.length>0){
-            textarea.setText("");
-            return true;
-        }
-        return false
+    // ─────────────────────────────────────────────────────────────
+
+    useEffect(() => {
+        setResponder("base", () => {
+            if (disabled) return false
+            const textarea = textareaRef.current
+            if (textarea && textarea.plainText.length > 0) {
+                textarea.setText("")
+                return true
+            }
+            return false
         })
-        return ()=>setResponder("base",null);
-    },[disabled,setResponder])
+        return () => setResponder("base", null)
+    }, [disabled, setResponder])
 
     return (
         <box
@@ -230,7 +203,7 @@ export function InputBar({
             alignItems="center"
             width="100%"
             flexShrink={0}
-            borderColor={colors.primary}
+            borderColor={borderColor}
             backgroundColor={colors.surface}
             minHeight={5}
         >
@@ -251,6 +224,7 @@ export function InputBar({
                     <text fg={promptColor}>
                         {disabled ? "✖ " : "› "}
                     </text>
+
                     {showCommandMenu && (
                         <box
                             position="absolute"
@@ -269,11 +243,12 @@ export function InputBar({
                             />
                         </box>
                     )}
+
                     <textarea
                         ref={textareaRef}
                         flexGrow={1}
                         flexShrink={1}
-                        initialValue=""
+                        initialValue={value}
                         keyBindings={TEXTAREA_KEYBOARD_SHORTCUTS}
                         placeholder={
                             disabled
@@ -282,13 +257,13 @@ export function InputBar({
                         }
                         backgroundColor="transparent"
                         focusedBackgroundColor="transparent"
-                        textColor={
-                            disabled
-                                ? "#444455"
-                                : "#E0E0F0"
+                        textColor={textColor}
+                        cursorColor={colors.primary}
+                        focused={
+                            !disabled &&
+                            focused &&
+                            (isTopLayer("base") || isTopLayer("command"))
                         }
-                        cursorColor="#4A9EFF"
-                        focused={!disabled && focused && (isTopLayer("base")|| isTopLayer("command"))}
                         onContentChange={handleTextAreaChange}
                         onSubmit={handleInputSubmit}
                     />
