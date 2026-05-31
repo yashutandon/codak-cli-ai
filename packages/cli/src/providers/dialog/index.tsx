@@ -4,6 +4,7 @@ import { TextAttributes,RGBA } from "@opentui/core";
 import { useKeyboard,useTerminalDimensions } from "@opentui/react";
 import type { DialogConfig } from "./types/types";
 import { useKeyboardLayer } from "../keyboard-layers";
+import { useTheme } from "../theme";
 
 export type DialogContextValue = {
     open:(config:DialogConfig)=>void;
@@ -75,6 +76,7 @@ function Dialog({currentDialog,close}:DialogProps){
     }
 
     const {title,children}=currentDialog;
+    const {colors}=useTheme();
 
     return (
         <box 
@@ -91,7 +93,7 @@ function Dialog({currentDialog,close}:DialogProps){
             >
                 <box width={Math.min(60,dimensions.width-4)}
                     height="auto"
-                    backgroundColor="#1A1A1A"
+                    backgroundColor={colors.background}
                     paddingX={4}
                     paddingY={1}
                     flexDirection="column"

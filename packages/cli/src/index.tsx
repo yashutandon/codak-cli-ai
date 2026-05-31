@@ -1,42 +1,35 @@
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
-import { initRegistry } from "./helpers/slot-registry"; // ← add karo
-import { Header } from "./components/layout/header";
-import { InputBar } from "./components/cli-input/input-bar";
-import { ToastProvider } from "./providers/toast"
-import { KeyboardLayerProvider } from "./providers/keyboard-layers";
-import { DialogProvider } from "./providers/dialog";
-import { ThemeProvider, useTheme } from "./providers/theme";
+import { initRegistry } from "./helpers/slot-registry"; 
+import { createMemoryRouter, RouterProvider } from "react-router";
+import { RootLayout } from "./components/layout/root-layout";
+import { Home } from "./screens/home";
+import { NewChat } from "./screens/new-chat";
+import  { Chat } from "./screens/chats";
 
-function ThemedRoot() {
-  const { colors } = useTheme();
-  return (
-    <box
-      backgroundColor={colors.background}
-      width="100%"
-      height="100%"
-      gap={1.5}
-    >
-      <Header />
-      <box>
-        <InputBar onSubmit={() => { }} />
-      </box>
-    </box>
-  )
-}
+const router = createMemoryRouter([
+  {
+    path: "/",
+    element: <RootLayout />,
+    children: [
+      {
+        index: true,
+        element: <Home />,
+      },
+      {
+        path: "session/new",
+        element: <NewChat />,
+      },
+      {
+        path: "session/:id",
+        element: <Chat/>,
+      },
+    ],
+  },
+]);
 
 function App() {
-  return (
-    <ThemeProvider>
-      <KeyboardLayerProvider>
-        <DialogProvider>
-          <ToastProvider>
-            <ThemedRoot />
-          </ToastProvider>
-        </DialogProvider>
-      </KeyboardLayerProvider>
-    </ThemeProvider>
-  );
+  return <RouterProvider router={router}/>;
 }
 
 const renderer = await createCliRenderer({

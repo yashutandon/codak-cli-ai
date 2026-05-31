@@ -1,4 +1,7 @@
+import { useTheme } from "../../providers/theme"
+
 export function Header() {
+  const { colors } = useTheme()
   return (
     <box
       style={{
@@ -10,7 +13,7 @@ export function Header() {
         paddingBottom: 1,
         gap: 0,
         borderStyle: "double",
-        borderColor: "#1E3A5F",
+        borderColor: colors.primary,
         titleAlignment: "center",
         bottomTitleAlignment: "center",
       }}
@@ -18,9 +21,8 @@ export function Header() {
       <ascii-font
         font="tiny"
         text="Codak"
-        color="#4A9EFF"
+        color="#ffffff"
       />
-     
     </box>
   )
 }

@@ -14,7 +14,6 @@ export function StatusBar({
   interactionMode = "Build",
 }: StatusBarProps) {
   const AppSlot = getAppSlot()
-  const {colors}=useTheme();
 
   return (
     <box
@@ -48,16 +47,16 @@ function DefaultStatusLeft({
   model,
   interactionMode,
 }: Required<StatusBarProps>) {
-  const {colors}=useTheme();
+  const { colors } = useTheme()
   return (
     <box flexDirection="row" gap={1} alignItems="center">
       <text fg={colors.primary} attributes={TextAttributes.BOLD}>
         {interactionMode}
       </text>
-      <text attributes={TextAttributes.DIM} fg="gray">
+      <text fg={colors.dimSeparator}>
         &gt;
       </text>
-      <text fg={colors.selection}>{model}</text>
+      <text fg={colors.info}>{model}</text>
     </box>
   )
 }
