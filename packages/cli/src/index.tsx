@@ -6,7 +6,7 @@ import { RootLayout } from "./components/layout/root-layout";
 import { Home } from "./screens/home";
 import { NewChat } from "./screens/new-chat";
 import  { Chat } from "./screens/chats";
-
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const router = createMemoryRouter([
   {
     path: "/",
@@ -36,5 +36,10 @@ const renderer = await createCliRenderer({
   targetFps: 60,
   exitOnCtrlC: false,
 });
+const queryClient = new QueryClient();
 initRegistry(renderer);
-createRoot(renderer).render(<App />);
+createRoot(renderer).render(
+<QueryClientProvider client={queryClient}>
+<App />
+</QueryClientProvider>)
+;
