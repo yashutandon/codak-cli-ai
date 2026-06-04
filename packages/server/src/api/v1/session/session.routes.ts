@@ -1,21 +1,10 @@
 import { Router } from "express";
+import { getAll, getById, create } from "./session.controller";
 
-import { sessionController } from "./session.controller";
+const sessionRouter = Router();
 
-export const sessionRouter =
-  Router();
+sessionRouter.get("/", getAll);
+sessionRouter.get("/:id", getById);
+sessionRouter.post("/", create);
 
-sessionRouter.get(
-  "/",
-  sessionController.getAll
-);
-
-sessionRouter.get(
-  "/:id",
-  sessionController.getById
-);
-
-sessionRouter.post(
-  "/",
-  sessionController.create
-);
+export default sessionRouter;

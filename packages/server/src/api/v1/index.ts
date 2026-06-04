@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { healthRouter } from "./health/health.routes";
-import { sessionRouter } from "./session/session.routes";
+import  sessionRouter  from "./session/session.routes";
 
 const v1Router = Router();
 
