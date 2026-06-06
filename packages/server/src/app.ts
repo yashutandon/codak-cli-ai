@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import "dotenv/config";
 
 import v1Router from "./api/v1";
 import { notFoundMiddleware } from "./middleware/not-found.middleware";
