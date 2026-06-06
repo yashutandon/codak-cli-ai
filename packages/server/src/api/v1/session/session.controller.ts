@@ -17,7 +17,7 @@ export async function getAll(
   next: NextFunction
 ): Promise<void> {
   try {
-    const sessions = getAllSessions(TEMP_USER_ID);
+    const sessions = await getAllSessions(TEMP_USER_ID);
 
     res.status(200).json({
       success: true,
@@ -34,7 +34,7 @@ export async function getById(
   next: NextFunction
 ): Promise<void> {
   try {
-    const session = getSessionById(req.params.id, TEMP_USER_ID);
+    const session = await getSessionById(req.params.id, TEMP_USER_ID);
 
     if (!session) {
       return next(new AppError("Session not found", 404));
@@ -61,7 +61,7 @@ export async function create(
       return next(new AppError(parsed.error.message, 400));
     }
 
-    const session = createSession(parsed.data, TEMP_USER_ID);
+    const session = await createSession(parsed.data, TEMP_USER_ID);
 
     res.status(201).json({
       success: true,

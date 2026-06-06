@@ -1,5 +1,5 @@
 {
-  "name": "database",
+  "name": "@codak/database",
   "module": "index.ts",
   "type": "module",
   "private": true,
