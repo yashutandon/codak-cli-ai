@@ -12,6 +12,8 @@ const newChatStateSchema = z.object({
   message: z.string(),
 });
 
+
+
 export function NewChat() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,9 +42,9 @@ export function NewChat() {
         const session = await createSession({
           title: state.message.slice(0, 50),
           intialMessage: {
-            role: "user",
+            role: "USER",
             content: state.message,
-            mode: "chat",
+            mode: "BUILD",
             model: "claude-opus-4.6",
           },
         });
@@ -75,7 +77,7 @@ export function NewChat() {
   if (!state) return null;
 
   return (
-    <ChatShell onSubmit={() => {}} inputDisabled loading>
+    <ChatShell onSubmit={() => { }} inputDisabled loading>
       <UserMessage message={state.message} />
       <BotMessage content="" model="claude-opus-4.6" />
     </ChatShell>

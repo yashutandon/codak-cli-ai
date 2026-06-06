@@ -14,6 +14,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role{
+  USER
+  ASSISTANT
+  ERROR
+}
+
+enum Mode{
+  BUILD
+  PLAN
+}
+enum MessageStatus{
+  COMPLETE
+  INTERRUPTED
+}
+
+
 model Session {
   id        String    @id @default(cuid())
   userId    String
@@ -29,17 +45,17 @@ model Session {
 model Message {
   id        String   @id @default(cuid())
   sessionId String
-  role      String
+  role      Role
+  status    MessageStatus
   content   String
   title     String   @default("")
-  status    String   @default("sent")
-  mode      String
+  mode      Mode
   model     String
-  part      String?
-  duration  String?
+  part      Json?
+  duration  Int?
   createdAt DateTime @default(now())
 
   session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
+  
   @@index([sessionId])
 }

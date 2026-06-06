@@ -1,4 +1,4 @@
-import {db} from "@codak/database"
+import { db } from "@codak/database";
 import type { CreateSessionDto, SessionDto, Mesage } from "./session.dto";
 
 export async function getAllSessions(userId: string): Promise<SessionDto[]> {
@@ -42,7 +42,7 @@ export async function createSession(
               mode: data.intialMessage.mode,
               model: data.intialMessage.model,
               title: "",
-              status: "sent",
+              status: "COMPLETE",
             },
           }
         : undefined,
