@@ -4,9 +4,9 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
-   previewFeatures = ["driverAdapters"]
+  provider        = "prisma-client-js"
+  output          = "../generated/prisma"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -14,21 +14,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role{
+enum Role {
   USER
   ASSISTANT
   ERROR
 }
 
-enum Mode{
+enum Mode {
   BUILD
   PLAN
 }
-enum MessageStatus{
+
+enum MessageStatus {
   COMPLETE
   INTERRUPTED
 }
 
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  password  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  sessions  Session[]
+
+  @@index([email])
+}
 
 model Session {
   id        String    @id @default(cuid())
@@ -38,24 +50,24 @@ model Session {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model Message {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   sessionId String
   role      Role
   status    MessageStatus
   content   String
-  title     String   @default("")
+  title     String        @default("")
   mode      Mode
   model     String
   part      Json?
   duration  Int?
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
+  session   Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  
   @@index([sessionId])
 }

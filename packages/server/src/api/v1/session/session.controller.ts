@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-
+import type { AuthRequest } from "../../middleware/auth.middleware";
 import {
   getAllSessions,
   getSessionById,
@@ -8,16 +8,14 @@ import {
 import { CreateSessionSchema } from "./session.dto";
 import { AppError } from "../../../utils/AppError";
 
-// TODO: replace with real auth middleware
-const TEMP_USER_ID = "user-1";
-
 export async function getAll(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const sessions = await getAllSessions(TEMP_USER_ID);
+    const userId = (req as AuthRequest).userId;
+    const sessions = await getAllSessions(userId);
 
     res.status(200).json({
       success: true,
@@ -34,7 +32,8 @@ export async function getById(
   next: NextFunction
 ): Promise<void> {
   try {
-    const session = await getSessionById(req.params.id, TEMP_USER_ID);
+    const userId = (req as unknown as AuthRequest).userId;
+    const session = await getSessionById(req.params.id, userId);
 
     if (!session) {
       return next(new AppError("Session not found", 404));
@@ -55,13 +54,14 @@ export async function create(
   next: NextFunction
 ): Promise<void> {
   try {
+    const userId = (req as AuthRequest).userId;
     const parsed = CreateSessionSchema.safeParse(req.body);
 
     if (!parsed.success) {
       return next(new AppError(parsed.error.message, 400));
     }
 
-    const session = await createSession(parsed.data, TEMP_USER_ID);
+    const session = await createSession(parsed.data, userId);
 
     res.status(201).json({
       success: true,
