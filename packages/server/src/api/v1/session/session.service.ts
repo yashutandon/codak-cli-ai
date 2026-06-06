@@ -1,53 +1,81 @@
-import { sessions } from "./session.store";
+import {db} from "@codak/database"
 import type { CreateSessionDto, SessionDto, Mesage } from "./session.dto";
 
-export function getAllSessions(userId: string): SessionDto[] {
-  return sessions
-    .filter((s) => s.userId === userId)
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+export async function getAllSessions(userId: string): Promise<SessionDto[]> {
+  const sessions = await db.session.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    include: { messages: true },
+  });
+
+  return sessions.map(toSessionDto);
 }
 
-export function getSessionById(
+export async function getSessionById(
   id: string,
   userId: string
-): SessionDto | undefined {
-  return sessions.find((s) => s.id === id && s.userId === userId);
+): Promise<SessionDto | null> {
+  const session = await db.session.findFirst({
+    where: { id, userId },
+    include: { messages: true },
+  });
+
+  if (!session) return null;
+
+  return toSessionDto(session);
 }
 
-export function createSession(
+export async function createSession(
   data: CreateSessionDto,
   userId: string
-): SessionDto {
-  const sessionId = crypto.randomUUID();
+): Promise<SessionDto> {
+  const session = await db.session.create({
+    data: {
+      title: data.title,
+      cwd: data.cwd ?? null,
+      userId,
+      messages: data.intialMessage
+        ? {
+            create: {
+              role: data.intialMessage.role,
+              content: data.intialMessage.content,
+              mode: data.intialMessage.mode,
+              model: data.intialMessage.model,
+              title: "",
+              status: "sent",
+            },
+          }
+        : undefined,
+    },
+    include: { messages: true },
+  });
 
-  const messages: Mesage[] = data.intialMessage
-    ? [
-        {
-          id: crypto.randomUUID(),
-          role: data.intialMessage.role,
-          title: "",
-          content: data.intialMessage.content,
-          status: "sent",
-          part: null,
-          mode: data.intialMessage.mode,
-          model: data.intialMessage.model,
-          duration: null,
-          createdAt: new Date(),
-          sessionId,
-        },
-      ]
-    : [];
+  return toSessionDto(session);
+}
 
-  const session: SessionDto = {
-    id: sessionId,
-    title: data.title,
-    cwd: data.cwd ?? null,
-    userId,
-    createdAt: new Date(),
-    messages,
+// --- mapper ---
+
+function toSessionDto(session: any): SessionDto {
+  return {
+    id: session.id,
+    title: session.title,
+    cwd: session.cwd ?? null,
+    userId: session.userId,
+    createdAt: session.createdAt,
+    messages: session.messages.map(
+      (m: any): Mesage => ({
+        id: m.id,
+        role: m.role,
+        title: m.title,
+        content: m.content,
+        status: m.status,
+        part: m.part ?? null,
+        mode: m.mode,
+        model: m.model,
+        duration: m.duration ?? null,
+        createdAt: m.createdAt,
+        sessionId: m.sessionId,
+      })
+    ),
   };
-
-  sessions.push(session);
-
-  return session;
 }
