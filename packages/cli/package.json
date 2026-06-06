@@ -12,15 +12,15 @@
     "@types/react-dom": "^19.2.3"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@opentui/core": "^0.2.15",
-    "@opentui/react": "^0.2.15",
+    "@opentui/core": "^0.3.2",
+    "@opentui/react": "^0.3.2",
     "@tanstack/react-query": "^5.101.0",
     "opentui-spinner": "^0.0.6",
     "react": "^19.2.6",
-    "react-router": "^7.17.0",
+    "react-router": "7.17.0",
     "zod": "^4.4.3"
   }
 }

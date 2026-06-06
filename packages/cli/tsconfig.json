@@ -1,9 +1,11 @@
 {
-    "extends": "../../tsconfig.base.json",
-    "compilerOptions": {
-        "jsx": "react-jsx",
-        "jsxImportSource": "@opentui/react",
-        "lib": ["ESNext", "dom"]
-
-    },
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@opentui/react",
+    "lib": ["ESNext", "dom"],
+    "types": ["bun"],
+    "moduleResolution": "bundler",
+    "paths": {}
+  }
 }

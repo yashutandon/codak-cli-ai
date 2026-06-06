@@ -1,11 +1,13 @@
 {
   "name": "codak",
   "version": "1.0.0",
-  "workspaces": ["packages/*"],
   "scripts": {
     "dev:cli": "bun run --watch  packages/cli/src/index.tsx",
     "dev:server": "bun run --watch  packages/server/src/index.ts",
     "dev:web": "cd packages/web && bun run dev"
+  },
+  "workspaces": ["packages/*"],
+  "dependencies": {
+    "react-router": "^7.17.0"
   }
-  
 }
