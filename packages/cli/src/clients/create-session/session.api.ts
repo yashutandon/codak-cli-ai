@@ -11,6 +11,23 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   };
 }
 
+export async function getAllSessions(): Promise<Session[]> {
+  const res = await fetch(`${BASE_URL}/sessions`, {
+    method: "GET",
+    headers: await getAuthHeaders(),
+  });
+
+  const json: ApiResponse<Session[]> = await res.json();
+
+  if (!res.ok || !json.success) {
+    throw new Error(
+      json?.message ?? json?.error ?? `HTTP ${res.status}: ${res.statusText}`
+    );
+  }
+
+  return json.data;
+}
+
 export async function createSession(
   payload: CreateSessionPayload
 ): Promise<Session> {
