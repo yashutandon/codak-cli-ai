@@ -24,13 +24,41 @@ export async function sendMessageHandler(
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
-    for await (const chunk of result.textStream) {
-      res.write(
-        `data: ${JSON.stringify({ type: "text-delta", text: chunk })}\n\n`
-      );
+    const write = (event: object) => {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
+    for await (const chunk of result.fullStream) {
+      if (chunk.type === "text-delta") {
+        write({ type: "text-delta", text: chunk.text });
+
+      } else if (chunk.type === "tool-call") {
+        const c = chunk as any;
+        write({
+          type: "tool-call",
+          toolCallId: c.toolCallId,
+          toolName: c.toolName,
+          args: c.input ?? c.args ?? {},
+        });
+
+      } else if (chunk.type === "tool-result") {
+        const c = chunk as any;
+        write({
+          type: "tool-result",
+          toolCallId: c.toolCallId,
+          result: String(c.output ?? c.result ?? ""),
+        });
+
+      } else if (chunk.type === "reasoning-delta") {
+        const c = chunk as any;
+        const text = c.textDelta ?? c.text;
+        if (text) write({ type: "reasoning-delta", text });
+
+      } else if (chunk.type === "finish") {
+        write({ type: "done" });
+      }
     }
 
-    res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
     res.end();
   } catch (err) {
     next(err);

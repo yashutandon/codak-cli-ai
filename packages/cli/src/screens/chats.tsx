@@ -1,15 +1,15 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router";
 import { z } from "zod";
-import { useTheme } from "../providers/theme";
 import { ChatShell } from "../components/chat-shell/shell";
 import { UserMessage } from "../components/messages/user-message";
 import { BotMessage } from "../components/messages/bot-message";
 import { ErrorMessage } from "../components/messages/error-message";
 import { getSessionById } from "../clients/create-session/session.api";
-import { sendMessage } from "../clients/message/message.api";
+import { sendMessage, type ToolCall, type ToolResult } from "../clients/message/message.api";
 import type { Session, Message } from "../clients/create-session/session.types";
 import { DEFAULT_CHAT_MODEL_ID } from "@codak/shared";
+import type { ToolCallWithResult } from "../components/messages/bot-message";
 
 const sessionLocationSchema = z.object({
   session: z.custom<Session>(
@@ -18,6 +18,15 @@ const sessionLocationSchema = z.object({
 });
 
 const MODEL = DEFAULT_CHAT_MODEL_ID;
+
+type StreamingTurn = {
+  content: string;
+  toolCalls: ToolCallWithResult[];
+  startedAt: number; // Date.now() when stream started
+};
+
+// Persisted message with optional duration
+type MessageWithDuration = Message & { durationMs?: number };
 
 export function Chat() {
   const { id } = useParams();
@@ -32,10 +41,10 @@ export function Chat() {
   const [session, setSession] = useState<Session | null>(
     prefetched?.session ?? null
   );
-  const [messages, setMessages] = useState<Message[]>(
+  const [messages, setMessages] = useState<MessageWithDuration[]>(
     prefetched?.session?.messages ?? []
   );
-  const [streamingContent, setStreamingContent] = useState<string | null>(null);
+  const [streamingTurn, setStreamingTurn] = useState<StreamingTurn | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,30 +78,64 @@ export function Chat() {
     return () => { ignore = true; };
   }, [id, prefetched, navigate]);
 
-  // ── Stream AI response only (no user message added to state) ─────────────
+  // ── Stream AI response ────────────────────────────────────────────────────
   const streamAiResponse = useCallback(async (sessionId: string, content: string) => {
-    setStreamingContent("");
+    const startedAt = Date.now();
+
+    setStreamingTurn({ content: "", toolCalls: [], startedAt });
     setIsStreaming(true);
     setError(null);
 
-    let accumulated = "";
+    let accText = "";
 
     await sendMessage(
       sessionId,
       content,
       MODEL,
       "BUILD",
+      // onChunk
       (chunk) => {
-        accumulated += chunk;
-        setStreamingContent(accumulated);
+        accText += chunk;
+        setStreamingTurn((prev) =>
+          prev
+            ? { ...prev, content: accText }
+            : { content: accText, toolCalls: [], startedAt }
+        );
       },
+      // onToolCall
+      (toolCall: ToolCall) => {
+        setStreamingTurn((prev) => {
+          const base = prev ?? { content: accText, toolCalls: [], startedAt };
+          return {
+            ...base,
+            toolCalls: [...base.toolCalls, { ...toolCall, pending: true }],
+          };
+        });
+      },
+      // onToolResult
+      (toolResult: ToolResult) => {
+        setStreamingTurn((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            toolCalls: prev.toolCalls.map((tc) =>
+              tc.toolCallId === toolResult.toolCallId
+                ? { ...tc, result: toolResult.result, pending: false }
+                : tc
+            ),
+          };
+        });
+      },
+      // onDone
       () => {
+         console.log("onDone called, accText:", accText.slice(0, 50));
+        const durationMs = Date.now() - startedAt;
         setMessages((prev) => [
           ...prev,
           {
             id: crypto.randomUUID(),
             role: "ASSISTANT",
-            content: accumulated,
+            content: accText,
             title: "",
             status: "COMPLETE",
             part: null,
@@ -101,14 +144,16 @@ export function Chat() {
             duration: null,
             createdAt: new Date().toISOString(),
             sessionId,
-          } as Message,
+            durationMs,
+          } as MessageWithDuration,
         ]);
-        setStreamingContent(null);
+        setStreamingTurn(null);
         setIsStreaming(false);
       },
+      // onError
       (err) => {
         setError(err);
-        setStreamingContent(null);
+        setStreamingTurn(null);
         setIsStreaming(false);
       }
     );
@@ -118,7 +163,7 @@ export function Chat() {
   const handleSubmit = useCallback(async (text: string) => {
     if (!session || isStreaming) return;
 
-    const userMsg: Message = {
+    const userMsg: MessageWithDuration = {
       id: crypto.randomUUID(),
       role: "USER",
       content: text,
@@ -136,7 +181,7 @@ export function Chat() {
     await streamAiResponse(session.id, text);
   }, [session, isStreaming, streamAiResponse]);
 
-  // ── Auto-trigger: respond to first unanswered USER message ───────────────
+  // ── Auto-trigger ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!session || autoTriggeredRef.current || isStreaming) return;
 
@@ -165,12 +210,22 @@ export function Chat() {
         msg.role === "USER" ? (
           <UserMessage key={msg.id} message={msg.content} />
         ) : (
-          <BotMessage key={msg.id} content={msg.content} model={msg.model} />
+          <BotMessage
+            key={msg.id}
+            content={msg.content}
+            model={msg.model}
+            durationMs={(msg as MessageWithDuration).durationMs}
+          />
         )
       )}
 
-      {streamingContent !== null && (
-        <BotMessage content={streamingContent} model={MODEL} />
+      {streamingTurn !== null && (
+        <BotMessage
+          content={streamingTurn.content}
+          model={MODEL}
+          toolCalls={streamingTurn.toolCalls}
+          streaming={true}
+        />
       )}
 
       {error && <ErrorMessage message={error} />}

@@ -1,15 +1,16 @@
-import { streamText } from "ai";
+import { streamText, stepCountIs } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { createGroq } from "@ai-sdk/groq";
 import { db } from "@codak/database";
-import { findSupportedChatModel } from "@codak/shared";
+import { findSupportedChatModel, tools as toolDefinitions } from "@codak/shared";
 import { AppError } from "../../../utils/AppError";
 import { redis } from "../../infra";
+import { executeTool } from "../../lib/tools";
 import type { SendMessageDto } from "./message.dto";
 
 const groq = createGroq({ apiKey: process.env.GROQ_API_KEY });
-const SESSION_CACHE_TTL = 60 * 5; // 5 minutes
+const SESSION_CACHE_TTL = 60 * 5;
 
 function getModel(modelId: string) {
   const found = findSupportedChatModel(modelId);
@@ -29,22 +30,12 @@ function getModel(modelId: string) {
 
 async function getSessionWithCache(sessionId: string, userId: string) {
   const cacheKey = `session:${sessionId}:${userId}`;
-
-  // Try Redis cache first
   const cached = await redis.get(cacheKey);
-  if (cached) {
-    return JSON.parse(cached);
-  }
+  if (cached) return JSON.parse(cached);
 
-  // DB fetch
   const session = await db.session.findFirst({
     where: { id: sessionId, userId },
-    include: {
-      messages: {
-        orderBy: { createdAt: "asc" },
-        take: 20,
-      },
-    },
+    include: { messages: { orderBy: { createdAt: "asc" }, take: 20 } },
   });
 
   if (session) {
@@ -58,18 +49,36 @@ async function invalidateSessionCache(sessionId: string, userId: string) {
   await redis.del(`session:${sessionId}:${userId}`);
 }
 
+function buildTools(cwd: string): Record<string, any> {
+  const result: Record<string, any> = {};
+
+  for (const [name, def] of Object.entries(toolDefinitions)) {
+    result[name] = {
+      description: def.description,
+      parameters: def.parameters,
+      execute: async (args: Record<string, unknown>) => {
+        try {
+          return await executeTool(name as any, args as any, cwd);
+        } catch (err) {
+          return `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      },
+    };
+  }
+
+  return result;
+}
+
 export async function sendMessage(
   sessionId: string,
   userId: string,
   data: SendMessageDto
 ) {
   const session = await getSessionWithCache(sessionId, userId);
+  if (!session) throw new AppError("Session not found", 404);
 
-  if (!session) {
-    throw new AppError("Session not found", 404);
-  }
+  const cwd = session.cwd ?? process.cwd();
 
-  // Save user message
   await db.message.create({
     data: {
       sessionId,
@@ -82,7 +91,6 @@ export async function sendMessage(
     },
   });
 
-  // Invalidate cache — new message added
   await invalidateSessionCache(sessionId, userId);
 
   const history = session.messages.map((m: any) => ({
@@ -92,21 +100,41 @@ export async function sendMessage(
 
   const result = streamText({
     model: getModel(data.model),
+    system: `You are Codak, an AI coding assistant in a CLI environment.
+Current working directory: ${cwd}
+
+STRICT RULES:
+- For casual conversation, greetings, or questions about yourself: respond with TEXT ONLY, no tools.
+- Use tools ONLY when user explicitly says: "read", "write", "list", "run", "create", "delete", "search" + a file/directory.
+- NEVER use tools just to answer a general question.
+- After using a tool, ALWAYS write a text response summarizing what you found. NEVER finish without text.
+- If you have already listed files once, do NOT list again unless asked.
+- After reading ANY file, ALWAYS respond with a text summary of what you read. Never end silently after a tool call.`,
     messages: [...history, { role: "user" as const, content: data.content }],
-    onFinish: async ({ text }) => {
+    tools: buildTools(cwd),
+    // @ts-ignore
+    stopWhen: stepCountIs(10),
+    onFinish: async ({ text, steps }) => {
+      // Saare steps ka text combine karo
+      const fullText = steps
+        .map((s: any) => s.text ?? "")
+        .filter(Boolean)
+        .join("\n")
+        .trim();
+
+      const finalContent = fullText || text || "";
+
       await db.message.create({
         data: {
           sessionId,
           role: "ASSISTANT",
-          content: text,
+          content: finalContent,
           mode: data.mode,
           model: data.model,
           status: "COMPLETE",
           title: "",
         },
       });
-
-      // Invalidate cache again after assistant message saved
       await invalidateSessionCache(sessionId, userId);
     },
   });
