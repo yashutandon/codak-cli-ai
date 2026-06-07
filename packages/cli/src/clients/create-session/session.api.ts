@@ -1,13 +1,22 @@
 import type { ApiResponse, CreateSessionPayload, Session } from "./session.types";
+import { getToken } from "../../auth";
 
 const BASE_URL = "http://localhost:3001/api/v1";
+
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const token = await getToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 export async function createSession(
   payload: CreateSessionPayload
 ): Promise<Session> {
   const res = await fetch(`${BASE_URL}/sessions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await getAuthHeaders(),
     body: JSON.stringify(payload),
   });
 
@@ -25,7 +34,7 @@ export async function createSession(
 export async function getSessionById(id: string): Promise<Session> {
   const res = await fetch(`${BASE_URL}/sessions/${id}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: await getAuthHeaders(),
   });
 
   const json: ApiResponse<Session> = await res.json();

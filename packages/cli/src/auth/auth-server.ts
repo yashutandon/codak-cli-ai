@@ -26,7 +26,7 @@ export function waitForToken(port: number): Promise<string> {
         <!DOCTYPE html>
         <html>
           <head>
-            <title>Codak — Authenticated</title>
+            <title>Codak Authenticated</title>
             <style>
               body { background: #080810; color: rgba(255,255,255,0.7); font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; flex-direction: column; gap: 12px; }
               h1 { color: #fff; font-size: 18px; letter-spacing: 0.2em; }
@@ -34,7 +34,7 @@ export function waitForToken(port: number): Promise<string> {
             </style>
           </head>
           <body>
-            <h1>✓ AUTHENTICATED</h1>
+            <h1> AUTHENTICATED</h1>
             <p>You can close this tab and return to the CLI.</p>
           </body>
         </html>

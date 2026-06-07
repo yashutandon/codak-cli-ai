@@ -120,18 +120,26 @@ export default function LoginPage() {
     window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/${provider}?${params}`;
   };
 
-  const redirectToCLI = (token: string) => {
-    if (!state) return;
-    try {
-      const [encoded] = state.split(".");
-      if (!encoded) throw new Error("Invalid state");
-      const payload = JSON.parse(Buffer.from(encoded, "base64url").toString());
-      const port = payload.port;
-      window.location.href = `http://localhost:${port}/callback?token=${encodeURIComponent(token)}&state=${encodeURIComponent(state)}`;
-    } catch {
-      toast.error("Invalid auth state. Please try again from the CLI.");
-    }
-  };
+ const redirectToCLI = (token: string) => {
+  console.log("state:", state);
+  console.log("token:", token);
+  if (!state) {
+    toast.error("No CLI state found. Please try again from the CLI.");
+    return;
+  }
+  try {
+    console.log("decoded:", atob(state));
+    const payload = JSON.parse(atob(state));
+    console.log("payload:", payload);
+    const port = payload.port;
+    if (!port) throw new Error("Invalid port");
+    console.log("redirecting to port:", port);
+    window.location.href = `http://localhost:${port}/callback?token=${encodeURIComponent(token)}&state=${encodeURIComponent(state)}`;
+  } catch (e) {
+    console.error("redirect error:", e);
+    toast.error("Invalid auth state. Please try again from the CLI.");
+  }
+};
 
   const handleToggle = () => {
     setIsRegister(!isRegister);
@@ -167,6 +175,9 @@ export default function LoginPage() {
           >
             CODAK
           </span>
+          <div className="mt-1 text-xs text-white/30 tracking-widest uppercase">
+            AI Engineering CLI
+          </div>
         </div>
 
         {/* Card */}
