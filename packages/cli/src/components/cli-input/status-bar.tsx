@@ -3,6 +3,7 @@
 import { TextAttributes } from "@opentui/core"
 import { getAppSlot } from "../../helpers/slot-registry"
 import { useTheme } from "../../providers/theme"
+import { DEFAULT_CHAT_MODEL_ID } from "@codak/shared"
 
 export type StatusBarProps = {
   model?: string
@@ -10,7 +11,7 @@ export type StatusBarProps = {
 }
 
 export function StatusBar({
-  model = "opus-4.6",
+  model = DEFAULT_CHAT_MODEL_ID,
   interactionMode = "Build",
 }: StatusBarProps) {
   const AppSlot = getAppSlot()

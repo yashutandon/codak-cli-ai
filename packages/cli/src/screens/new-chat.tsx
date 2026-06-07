@@ -2,22 +2,22 @@ import { useEffect, useMemo, useRef } from "react";
 import { z } from "zod";
 import { useLocation, useNavigate } from "react-router";
 import { useTheme } from "../providers/theme";
-import { ErrorMessage } from "../components/messages/error-message";
 import { UserMessage } from "../components/messages/user-message";
 import { BotMessage } from "../components/messages/bot-message";
 import { ChatShell } from "../components/chat-shell/shell";
 import { createSession } from "../clients/create-session/session.api";
+import { DEFAULT_CHAT_MODEL_ID } from "@codak/shared";
 
 const newChatStateSchema = z.object({
   message: z.string(),
 });
 
 
+const MODEL=DEFAULT_CHAT_MODEL_ID
 
 export function NewChat() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { colors } = useTheme();
   const hasStartedRef = useRef(false);
 
   const state = useMemo(() => {
@@ -45,7 +45,7 @@ export function NewChat() {
             role: "USER",
             content: state.message,
             mode: "BUILD",
-            model: "claude-opus-4.6",
+            model: MODEL,
           },
         });
 
@@ -61,7 +61,10 @@ export function NewChat() {
         navigate("/", {
           replace: true,
           state: {
-            error: error instanceof Error ? error.message : "Failed to create session",
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to create session",
           },
         });
       }
@@ -77,9 +80,9 @@ export function NewChat() {
   if (!state) return null;
 
   return (
-    <ChatShell onSubmit={() => { }} inputDisabled loading>
+    <ChatShell onSubmit={() => {}} inputDisabled loading>
       <UserMessage message={state.message} />
-      <BotMessage content="" model="claude-opus-4.6" />
+      <BotMessage content="" model={MODEL} />
     </ChatShell>
   );
 }

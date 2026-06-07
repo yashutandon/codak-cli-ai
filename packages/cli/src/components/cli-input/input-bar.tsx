@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { useKeyboard } from "@opentui/react"
 import type { InputRenderable, KeyBinding } from "@opentui/core"
+import { useNavigate } from "react-router"
 
 import { StatusBar, type StatusBarProps } from "./status-bar"
 import { EmptyBorder } from "../common/border"
@@ -14,6 +15,7 @@ import { useToast } from "../../providers/toast"
 import { useKeyboardLayer } from "../../providers/keyboard-layers"
 import { useDialog } from "../../providers/dialog"
 import { useTheme } from "../../providers/theme"
+import { clearToken } from "../../auth"
 
 export type InputBarProps = {
     onSubmit: (text: string) => void
@@ -33,6 +35,8 @@ export function InputBar({
     const textareaRef = useRef<TextareaRenderable>(null)
     const onSubmitRef = useRef<() => void>(() => { })
     const renderer = useRenderer()
+    const navigate = useNavigate()
+
     const {
         showCommandMenu,
         commandQuery,
@@ -55,16 +59,16 @@ export function InputBar({
         textarea.setText("")
         if (command.action) {
             command.action({
-                exit: () => {
-                    renderer.destroy()
-                },
+                exit: () => renderer.destroy(),
                 toast,
                 dialog,
+                navigate,
+                clearToken,
             })
         } else {
             textarea.insertText(command.value + "")
         }
-    }, [renderer, toast, dialog])
+    }, [renderer, toast, dialog, navigate])
 
     const handleSelectByCommand = useCallback((_command: string) => {
         // selectedIndex is managed by useCommandMenu
@@ -78,9 +82,10 @@ export function InputBar({
         }
     }, [selectedIndex, resolveCommand, closeMenu, handleCommand])
 
-    const handleTextAreaChange = useCallback((event: ContentChangeEvent) => {
+    const handleTextAreaChange = useCallback((_event: ContentChangeEvent) => {
         const textarea = textareaRef.current
         if (!textarea) return
+        setValue(textarea.plainText)  
         handleContentChange(textarea.plainText)
     }, [handleContentChange])
 
@@ -153,7 +158,6 @@ export function InputBar({
         { name: "enter", shift: true, action: "newline" },
     ]
 
-    // ── Theme-aware colors ────────────────────────────────────────
     const borderColor = disabled
         ? colors.dimSeparator
         : focused
@@ -174,9 +178,7 @@ export function InputBar({
 
     const textColor = disabled
         ? colors.dimSeparator
-        : colors.thinking   // bright but neutral — good for input text
-
-    // ─────────────────────────────────────────────────────────────
+        : colors.thinking
 
     useEffect(() => {
         setResponder("base", () => {
@@ -272,7 +274,7 @@ export function InputBar({
                         {disabled
                             ? ""
                             : value.trim().length > 0
-                                ? " ↵"
+                                ? "↵"
                                 : "esc to cancel"}
                     </text>
                 </box>
