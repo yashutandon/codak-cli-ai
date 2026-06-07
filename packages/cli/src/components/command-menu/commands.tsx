@@ -1,175 +1,85 @@
-import { ThemeDialogContent } from "../theme/theme-dialog";
-import type { Command } from "./types/command.types";
+import { ThemeDialogContent } from "../theme/theme-dialog"
+import { SessionsDialogContent } from "./session-dialog"
+import { clearToken } from "../../auth"
+import type { Command } from "./types/command.types"
+import { HelpDialogContent } from "./help-dialog"
 
 export const COMMANDS: Command[] = [
-    // Conversation Commands
+    // ── Conversation ─────────────────────────────────────────────
     {
         name: "New Conversation",
         description: "Start a new conversation",
         value: "@new",
         action: (ctx) => {
-            // ctx.toast.show({
-            //     message: "New conversation started!",
-            //     variant: "success",
-            // });
-
-            ctx.dialog.open({
-                title:"Open new chat",
-                children:<text>New chat option coming soon</text>
-            })
-        }
+            ctx.navigate("/", { replace: false })
+        },
     },
     {
         name: "Open Conversation",
-        description: "Open an existing conversation",
+        description: "Browse and open an existing session",
         value: "@open",
         action: (ctx) => {
-            ctx.toast.show({
-                message: "Conversation opened!",
-                variant: "info",
-            });
-        }
-    },
-    {
-        name: "Save Conversation",
-        description: "Save the current conversation",
-        value: "@save",
-        action: (ctx) => {
-            ctx.toast.show({
-                message: "Conversation saved!",
-                variant: "success",
-            });
-        }
+            ctx.dialog.open({
+                title: "Open Session",
+                children: <SessionsDialogContent navigate={ctx.navigate} />,
+            })
+        },
     },
     {
         name: "Close Conversation",
-        description: "Close the current conversation",
+        description: "Go back to home screen",
         value: "@close",
         action: (ctx) => {
-            ctx.toast.show({
-                message: "Conversation closed!",
-                variant: "warning",
-            });
-        }
+            ctx.navigate("/", { replace: true })
+        },
     },
 
-    // Authentication
-    {
-        name: "Login",
-        description: "Sign in to your account",
-        value: "@login",
-        action: (ctx) => {
-            ctx.toast.show({
-                message: "Logged in!",
-                variant: "success",
-            });
-        }
-    },
+    // ── Auth ─────────────────────────────────────────────────────
     {
         name: "Logout",
-        description: "Sign out of your account",
+        description: "Sign out and clear saved token",
         value: "@logout",
-        action: (ctx) => {
+        action: async (ctx) => {
+            await clearToken()
             ctx.toast.show({
-                message: "Logged out!",
+                message: "Logged out. Restart the CLI to sign in again.",
                 variant: "info",
-            });
-        }
-    },
-    {
-        name: "Register",
-        description: "Create a new account",
-        value: "@register",
-        action: (ctx) => {
-            ctx.toast.show({
-                message: "Account created!",
-                variant: "success",
-            });
-        }
-    },
-    {
-        name: "Profile",
-        description: "View your profile",
-        value: "@profile",
-        action: (ctx) => {
-            ctx.toast.show({
-                message: "Profile opened!",
-                variant: "info",
-            });
-        }
+            })
+        },
     },
 
-    // Theme Commands
-  
+    // ── Theme ────────────────────────────────────────────────────
     {
         name: "Theme",
-        description: "Change colpr theme",
+        description: "Change color theme",
         value: "@theme",
         action: (ctx) => {
-           ctx.dialog.open({
-            title:"Select Theme",
-            children:<ThemeDialogContent/>
-           })
-        }
+            ctx.dialog.open({
+                title: "Select Theme",
+                children: <ThemeDialogContent />,
+            })
+        },
     },
 
-    // Application
-    {
-        name: "Settings",
-        description: "Open application settings",
-        value: "@settings",
-        action: (ctx) => {
-            ctx.toast.show({
-                message: "Settings opened!",
-                variant: "info",
-            });
-        }
-    },
+    // ── App ──────────────────────────────────────────────────────
     {
         name: "Help",
         description: "Show available commands",
         value: "@help",
         action: (ctx) => {
-            ctx.toast.show({
-                message: "Help opened!",
-                variant: "info",
-            });
-        }
+            ctx.dialog.open({
+                title: "Available Commands",
+                children: <HelpDialogContent />,
+            })
+        },
     },
     {
-        name: "Clear Chat",
-        description: "Clear current conversation",
-        value: "@clear",
+        name: "Exit",
+        description: "Exit the application",
+        value: "@exit",
         action: (ctx) => {
-            ctx.toast.show({
-                message: "Chat cleared!",
-                variant: "warning",
-            });
-        }
+            ctx.exit()
+        },
     },
-    {
-        name: "Export Chat",
-        description: "Export conversation history",
-        value: "@export",
-        action: (ctx) => {
-            ctx.toast.show({
-                message: "Chat exported!",
-                variant: "success",
-            });
-        }
-    },
+]
 
-    // Exit
-    {
-    name: "Exit",
-    description: "Exit the application",
-    value: "@exit",
-    action: (ctx) => {
-        ctx.toast.show({
-            message: "Exiting application!",
-            variant: "info",
-        });
-        ctx.exit();
-    },
-},
-];

@@ -29,38 +29,7 @@ export function Home() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  useEffect(() => {
-    let ignore = false;
-    getAllSessions()
-      .then((data) => {
-        if (!ignore) setSessions(data);
-      })
-      .catch(() => {});
-    return () => {
-      ignore = true;
-    };
-  }, []);
 
-  useKeyboard((key) => {
-    if (sessions.length === 0) return;
-
-    if (key.name === "up") {
-      key.preventDefault();
-      setSelectedIndex((i) => Math.max(0, i - 1));
-    }
-
-    if (key.name === "down") {
-      key.preventDefault();
-      setSelectedIndex((i) => Math.min(sessions.length - 1, i + 1));
-    }
-
-    if (key.name === "return") {
-      const session = sessions[selectedIndex];
-      if (session) {
-        navigate(`/session/${session.id}`, { state: { session } });
-      }
-    }
-  });
 
   const handleSubmit = useCallback(
     (text: string) => {
@@ -100,7 +69,7 @@ export function Home() {
                     : session.title}
                 </text>
                 <text attributes={TextAttributes.DIM}>
-                  {formatDate(session.createdAt as unknown as string)}
+                  {formatDate(session.createdAt)}
                 </text>
               </box>
             ))}
