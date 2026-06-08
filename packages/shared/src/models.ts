@@ -98,5 +98,5 @@ export function findSupportedChatModel(modelId: string) {
     return SUPPORTED_CHAT_MODELS.find((model) => model.id === modelId);
 }
 
-export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "llama-3.3-70b-versatile";
-// export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId ="gemini-2.5-flash"
+// export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "llama-3.3-70b-versatile";
+export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId ="gemini-2.5-flash"

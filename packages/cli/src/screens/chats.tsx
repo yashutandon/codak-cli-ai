@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useParams, useLocation, useNavigate } from "react-router";
 import { z } from "zod";
 import { ChatShell } from "../components/chat-shell/shell";
@@ -22,10 +22,9 @@ const MODEL = DEFAULT_CHAT_MODEL_ID;
 type StreamingTurn = {
   content: string;
   toolCalls: ToolCallWithResult[];
-  startedAt: number; // Date.now() when stream started
+  startedAt: number;
 };
 
-// Persisted message with optional duration
 type MessageWithDuration = Message & { durationMs?: number };
 
 export function Chat() {
@@ -36,7 +35,7 @@ export function Chat() {
   const prefetched = useMemo(() => {
     const parsed = sessionLocationSchema.safeParse(location.state);
     return parsed.success ? parsed.data : null;
-  }, [location.state]);
+  }, [location.state, id]);
 
   const [session, setSession] = useState<Session | null>(
     prefetched?.session ?? null
@@ -50,13 +49,23 @@ export function Chat() {
 
   const autoTriggeredRef = useRef(false);
 
-  // ── Fetch session if not prefetched ──────────────────────────────────────
+  // ── Reset state on id change ──────────────────────────────────────────────
   useEffect(() => {
-    if (prefetched?.session) return;
-
-    setSession(null);
+    setSession(prefetched?.session ?? null);
+    setMessages(prefetched?.session?.messages ?? []);
+    setStreamingTurn(null);
+    setIsStreaming(false);
     setError(null);
     autoTriggeredRef.current = false;
+  }, [id]);
+
+  // ── Fetch session if not prefetched ──────────────────────────────────────
+  useEffect(() => {
+    if (prefetched?.session) {
+      setSession(prefetched.session);
+      setMessages(prefetched.session.messages);
+      return;
+    }
 
     if (!id) return;
 
@@ -93,7 +102,6 @@ export function Chat() {
       content,
       MODEL,
       "BUILD",
-      // onChunk
       (chunk) => {
         accText += chunk;
         setStreamingTurn((prev) =>
@@ -102,7 +110,6 @@ export function Chat() {
             : { content: accText, toolCalls: [], startedAt }
         );
       },
-      // onToolCall
       (toolCall: ToolCall) => {
         setStreamingTurn((prev) => {
           const base = prev ?? { content: accText, toolCalls: [], startedAt };
@@ -112,7 +119,6 @@ export function Chat() {
           };
         });
       },
-      // onToolResult
       (toolResult: ToolResult) => {
         setStreamingTurn((prev) => {
           if (!prev) return prev;
@@ -126,9 +132,7 @@ export function Chat() {
           };
         });
       },
-      // onDone
       () => {
-         console.log("onDone called, accText:", accText.slice(0, 50));
         const durationMs = Date.now() - startedAt;
         setMessages((prev) => [
           ...prev,
@@ -150,7 +154,6 @@ export function Chat() {
         setStreamingTurn(null);
         setIsStreaming(false);
       },
-      // onError
       (err) => {
         setError(err);
         setStreamingTurn(null);
@@ -195,7 +198,7 @@ export function Chat() {
     streamAiResponse(session.id, lastMsg.content);
   }, [session, messages, isStreaming, streamAiResponse]);
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   if (!session) {
     return <ChatShell onSubmit={() => {}} inputDisabled loading />;
   }

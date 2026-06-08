@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { z } from "zod";
 import { useLocation, useNavigate } from "react-router";
-import { useTheme } from "../providers/theme";
 import { UserMessage } from "../components/messages/user-message";
 import { BotMessage } from "../components/messages/bot-message";
 import { ChatShell } from "../components/chat-shell/shell";
