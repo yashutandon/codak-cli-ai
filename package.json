@@ -8,6 +8,10 @@
   },
   "workspaces": ["packages/*"],
   "dependencies": {
+    "glob": "^13.0.6",
     "react-router": "^7.17.0"
+  },
+  "devDependencies": {
+    "@types/glob": "^9.0.0"
   }
 }
