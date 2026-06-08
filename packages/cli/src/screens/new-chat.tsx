@@ -40,6 +40,7 @@ export function NewChat() {
       try {
         const session = await createSession({
           title: state.message.slice(0, 50),
+          cwd: process.cwd(),
           intialMessage: {
             role: "USER",
             content: state.message,

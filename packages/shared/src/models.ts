@@ -31,6 +31,16 @@ export const SUPPORTED_CHAT_MODELS = [
 
     // OpenAI
     {
+        id: "gpt-4o",
+        provider: "openai",
+        pricing: { inputUsedMillionTokens: 2.5, outputUsedMillionTokens: 10 },
+    },
+    {
+        id: "gpt-4o-mini",
+        provider: "openai",
+        pricing: { inputUsedMillionTokens: 0.15, outputUsedMillionTokens: 0.6 },
+    },
+    {
         id: "gpt-5.4",
         provider: "openai",
         pricing: { inputUsedMillionTokens: 2.5, outputUsedMillionTokens: 15 },
@@ -88,7 +98,7 @@ export const SUPPORTED_CHAT_MODELS = [
         provider: "groq",
         pricing: { inputUsedMillionTokens: 0, outputUsedMillionTokens: 0 },
     },
-    
+
 ] as const satisfies readonly SupportedChatModelDefinition[];
 
 export type SupportedChatModel = (typeof SUPPORTED_CHAT_MODELS)[number];
@@ -99,4 +109,5 @@ export function findSupportedChatModel(modelId: string) {
 }
 
 // export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "llama-3.3-70b-versatile";
-export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId ="gemini-2.5-flash"
+// export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId ="gemini-2.0-flash"
+export const DEFAULT_CHAT_MODEL_ID: SupportedChatModelId = "gpt-5.4-mini";

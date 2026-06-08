@@ -7,13 +7,14 @@ import { findSupportedChatModel, tools as toolDefinitions } from "@codak/shared"
 import { AppError } from "../../../utils/AppError";
 import { redis } from "../../infra";
 import { executeTool } from "../../lib/tools";
-import type { SendMessageDto } from "./message.dto";
+import type { SendMessageDto } from "./message.dto"
+import { openai } from "@ai-sdk/openai";;
 
 const groq = createGroq({ apiKey: process.env.GROQ_API_KEY });
 const SESSION_CACHE_TTL = 60 * 5;
 
 function getModel(modelId: string) {
-  const found = findSupportedChatModel(modelId);
+  const found = findSupportedChatModel(modelId) as { id: string; provider: string; pricing: any } | undefined;
   if (!found) throw new AppError(`Unsupported model: ${modelId}`, 400);
 
   switch (found.provider) {
@@ -23,6 +24,8 @@ function getModel(modelId: string) {
       return google(modelId as Parameters<typeof google>[0]);
     case "groq":
       return groq(modelId);
+    case "openai":
+      return openai(modelId as Parameters<typeof openai>[0]);
     default:
       throw new AppError(`Unsupported provider: ${found.provider}`, 400);
   }
