@@ -35,7 +35,12 @@ async function getSessionWithCache(sessionId: string, userId: string) {
 
   const session = await db.session.findFirst({
     where: { id: sessionId, userId },
-    include: { messages: { orderBy: { createdAt: "asc" }, take: 20 } },
+    include: {
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 6,
+      },
+    },
   });
 
   if (session) {
@@ -69,6 +74,18 @@ function buildTools(cwd: string): Record<string, any> {
   return result;
 }
 
+function enrichUserMessage(content: string): string {
+  const trimmed = content.trim();
+  const looksLikeFile = /^[\w./\\-]+\.\w+$/.test(trimmed);
+  const looksLikePath = /^[./\\]/.test(trimmed) || trimmed.includes("/");
+
+  if (looksLikeFile || looksLikePath) {
+    return `Read and show me the contents of: ${trimmed}`;
+  }
+
+  return content;
+}
+
 export async function sendMessage(
   sessionId: string,
   userId: string,
@@ -93,10 +110,15 @@ export async function sendMessage(
 
   await invalidateSessionCache(sessionId, userId);
 
-  const history = session.messages.map((m: any) => ({
-    role: m.role === "USER" ? ("user" as const) : ("assistant" as const),
-    content: m.content,
-  }));
+  const history = session.messages
+    .reverse()
+    .filter((m: any) => m.content?.trim())
+    .map((m: any) => ({
+      role: m.role === "USER" ? ("user" as const) : ("assistant" as const),
+      content: m.content,
+    }));
+
+  const userContent = enrichUserMessage(data.content);
 
   const result = streamText({
     model: getModel(data.model),
@@ -106,16 +128,15 @@ Current working directory: ${cwd}
 STRICT RULES:
 - For casual conversation, greetings, or questions about yourself: respond with TEXT ONLY, no tools.
 - Use tools ONLY when user explicitly says: "read", "write", "list", "run", "create", "delete", "search" + a file/directory.
+- Use MAXIMUM 2 tool calls per response, then write a text summary.
 - NEVER use tools just to answer a general question.
-- After using a tool, ALWAYS write a text response summarizing what you found. NEVER finish without text.
-- If you have already listed files once, do NOT list again unless asked.
-- After reading ANY file, ALWAYS respond with a text summary of what you read. Never end silently after a tool call.`,
-    messages: [...history, { role: "user" as const, content: data.content }],
+- After using a tool, ALWAYS write a text response. NEVER finish without text.
+- "package.json" or any filename alone means read that file ONCE, then explain contents in text.`,
+    messages: [...history, { role: "user" as const, content: userContent }],
     tools: buildTools(cwd),
     // @ts-ignore
     stopWhen: stepCountIs(10),
     onFinish: async ({ text, steps }) => {
-      // Saare steps ka text combine karo
       const fullText = steps
         .map((s: any) => s.text ?? "")
         .filter(Boolean)
