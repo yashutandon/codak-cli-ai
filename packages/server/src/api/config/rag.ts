@@ -2,13 +2,14 @@ export const RAG_CONFIG = {
   chunkSize: 150,
   chunkOverlap: 20,
   topK: 5,
-  embeddingModel: "text-embedding-004",
-  embeddingDimension: 768,
-  maxFileSizeBytes: 500 * 1024, // 500KB skip karo
+  embeddingModel: "gemini-embedding-001",
+  embeddingDimension: 3072,
+  maxFileSizeBytes: 500 * 1024,
   rateLimit: {
-    requestsPerMinute: 60, // Google free tier
-    batchSize: 10,         // ek baar mein kitni files
-    delayBetweenBatchesMs: 1000,
+    requestsPerMinute: 15,
+    batchSize: 3,
+    delayBetweenBatchesMs: 5000,
+    retryDelayMs: 65_000, // 429 pe wait
   },
   supportedExtensions: [
     ".ts", ".tsx", ".js", ".jsx",

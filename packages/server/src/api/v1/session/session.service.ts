@@ -1,4 +1,5 @@
 import { db } from "@codak/database";
+import { indexCodebase } from "../../infra/embeddings";
 import type { CreateSessionDto, SessionDto, Mesage } from "./session.dto";
 
 export async function getAllSessions(userId: string): Promise<SessionDto[]> {
@@ -49,6 +50,13 @@ export async function createSession(
     },
     include: { messages: true },
   });
+
+  // Background indexing — fire and forget
+  if (session.cwd) {
+    indexCodebase(session.id, session.cwd).catch((err) =>
+      console.error("[RAG] Background indexing failed:", err)
+    );
+  }
 
   return toSessionDto(session);
 }
