@@ -34,7 +34,8 @@ export async function searchFilesTool(
   params: { pattern: string; path?: string },
   cwd: string
 ): Promise<string> {
-  const searchPath = resolve(cwd, params.path ?? ".");
+  const safePath = (params.path ?? ".").replace(/^\/+/, "");
+  const searchPath = resolve(cwd, safePath);
   const results: string[] = [];
 
   try {
