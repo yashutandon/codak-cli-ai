@@ -64,3 +64,24 @@ export async function getSessionById(id: string): Promise<Session> {
 
   return json.data;
 }
+
+export async function updateSessionCwd(
+  id: string,
+  cwd: string
+): Promise<Session> {
+  const res = await fetch(`${BASE_URL}/sessions/${id}`, {
+    method: "PATCH",
+    headers: await getAuthHeaders(),
+    body: JSON.stringify({ cwd }),
+  });
+
+  const json: ApiResponse<Session> = await res.json();
+
+  if (!res.ok || !json.success) {
+    throw new Error(
+      json?.message ?? json?.error ?? `HTTP ${res.status}: ${res.statusText}`
+    );
+  }
+
+  return json.data;
+}

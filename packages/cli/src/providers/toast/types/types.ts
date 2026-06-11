@@ -1,9 +1,9 @@
-export type ToastVarient= "success" | "error" | "info" | "warning"
+export type ToastVariant = "success" | "error" | "info" | "warning"
 
 export type ToastOptions = {
     message: string
-    variant?: ToastVarient
+    variant?: ToastVariant
     duration?: number
-};
+}
 
-export const DEFAULT_TOAST_DURATION = 3000;
+export const DEFAULT_TOAST_DURATION = 3000

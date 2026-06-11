@@ -1,12 +1,10 @@
-import { createContext, useContext, useState, useRef, useCallback } from "react";
-
-import type { ReactNode } from "react";
-import type { ToastOptions, ToastVarient } from "./types/types";
-import { DEFAULT_TOAST_DURATION } from "./types/types";
+import { createContext, useContext, useState, useRef, useCallback } from "react"
+import type { ReactNode } from "react"
+import type { ToastOptions, ToastVariant } from "./types/types"
+import { DEFAULT_TOAST_DURATION } from "./types/types"
 import { useTerminalDimensions } from "@opentui/react"
-import { SplitBorder } from "../../components/common/border";
-import { useTheme } from "../theme";
-
+import { SplitBorder } from "../../components/common/border"
+import { useTheme } from "../theme"
 
 export type ToastContextValue = {
     show: (options: ToastOptions) => void
@@ -30,27 +28,30 @@ export function ToastProvider({ children }: ToastProviderProps) {
     const [currentToast, setCurrentToast] = useState<ToastOptions | null>(null)
     const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-    const clearcurrentTimeout = useCallback(() => {
+    const clearCurrentTimeout = useCallback(() => {
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current)
             timeoutRef.current = null
         }
-    }, []);
+    }, [])
 
-    const show = useCallback((options: ToastOptions) => {
-        const duration = options.duration ?? DEFAULT_TOAST_DURATION
+    const show = useCallback(
+        (options: ToastOptions) => {
+            const duration = options.duration ?? DEFAULT_TOAST_DURATION
 
-        clearcurrentTimeout()
-        setCurrentToast({
-            variant: options.variant ?? "info",
-            ...options,
-            duration,
-        })
-        timeoutRef.current = setTimeout(() => {
-            setCurrentToast(null)
-            timeoutRef.current = null
-        }, duration).unref()
-    }, [clearcurrentTimeout])
+            clearCurrentTimeout()
+            setCurrentToast({
+                variant: options.variant ?? "info",
+                ...options,
+                duration,
+            })
+            timeoutRef.current = setTimeout(() => {
+                setCurrentToast(null)
+                timeoutRef.current = null
+            }, duration).unref()
+        },
+        [clearCurrentTimeout],
+    )
 
     const value: ToastContextValue = { show }
 
@@ -72,11 +73,11 @@ function Toast({ currentToast }: ToastProps) {
 
     if (!currentToast) return null
 
-    const variantColors: Record<ToastVarient, string> = {
+    const variantColors: Record<ToastVariant, string> = {
         success: colors.success,
-        error:   colors.error,
-        info:    colors.info,
-        warning: colors.planMode,   
+        error: colors.error,
+        info: colors.info,
+        warning: colors.planMode,
     }
 
     const borderColor = currentToast.variant
