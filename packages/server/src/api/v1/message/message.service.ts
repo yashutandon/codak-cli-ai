@@ -1,4 +1,4 @@
-import { streamText, stepCountIs } from "ai";
+import { streamText, stepCountIs, tool } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { createGroq } from "@ai-sdk/groq";
@@ -22,9 +22,9 @@ function getModel(modelId: string) {
 
   switch (found.provider) {
     case "anthropic": return anthropic(modelId as Parameters<typeof anthropic>[0]);
-    case "google":    return google(modelId as Parameters<typeof google>[0]);
-    case "groq":      return groq(modelId);
-    case "openai":    return openai(modelId as Parameters<typeof openai>[0]);
+    case "google": return google(modelId as Parameters<typeof google>[0]);
+    case "groq": return groq(modelId);
+    case "openai": return openai(modelId as Parameters<typeof openai>[0]);
     default: throw new AppError(`Unsupported provider: ${found.provider}`, 400);
   }
 }
@@ -55,24 +55,57 @@ async function invalidateSessionCache(sessionId: string, userId: string) {
   await redis.del(`session:${sessionId}:${userId}`);
 }
 
-function buildTools(cwd: string): Record<string, any> {
-  const result: Record<string, any> = {};
+function buildTools(cwd: string) {
+  return {
+    read_file: tool({
+      description: toolDefinitions.read_file.description,
+      inputSchema: toolDefinitions.read_file.parameters,
+      execute: async (args) =>
+        executeTool("read_file", args, cwd),
+    }),
 
-  for (const [name, def] of Object.entries(toolDefinitions)) {
-    result[name] = {
-      description: def.description,
-      parameters: def.parameters,
-      execute: async (args: Record<string, unknown>) => {
-        try {
-          return await executeTool(name as any, args as any, cwd);
-        } catch (err) {
-          return `Error: ${err instanceof Error ? err.message : String(err)}`;
-        }
-      },
-    };
-  }
+    write_file: tool({
+      description: toolDefinitions.write_file.description,
+      inputSchema: toolDefinitions.write_file.parameters,
+      execute: async (args) =>
+        executeTool("write_file", args, cwd),
+    }),
 
-  return result;
+    list_files: tool({
+      description: toolDefinitions.list_files.description,
+      inputSchema: toolDefinitions.list_files.parameters,
+      execute: async (args) =>
+        executeTool("list_files", args, cwd),
+    }),
+
+    run_command: tool({
+      description: toolDefinitions.run_command.description,
+      inputSchema: toolDefinitions.run_command.parameters,
+      execute: async (args) =>
+        executeTool("run_command", args, cwd),
+    }),
+
+    create_directory: tool({
+      description: toolDefinitions.create_directory.description,
+      inputSchema: toolDefinitions.create_directory.parameters,
+      execute: async (args) =>
+        executeTool("create_directory", args, cwd),
+    }),
+
+    delete_file: tool({
+      description: toolDefinitions.delete_file.description,
+      inputSchema: toolDefinitions.delete_file.parameters,
+      execute: async (args) =>
+        executeTool("delete_file", args, cwd),
+    }),
+
+    search_files: tool({
+      description: toolDefinitions.search_files.description,
+      inputSchema: toolDefinitions.search_files.parameters,
+      execute: async (args) =>
+        executeTool("search_files", args, cwd),
+    }),
+  };
 }
 
 export async function sendMessage(
@@ -82,7 +115,7 @@ export async function sendMessage(
 ) {
   // FIX: pehle cache invalidate, phir session fetch
   await invalidateSessionCache(sessionId, userId);
-  
+
   const session = await db.session.findFirst({
     where: { id: sessionId, userId },
     include: {
@@ -92,7 +125,7 @@ export async function sendMessage(
       },
     },
   });
-  
+
   if (!session) throw new AppError("Session not found", 404);
 
   const cwd = session.cwd ?? process.cwd();
@@ -131,6 +164,11 @@ export async function sendMessage(
 
   const result = streamText({
     model: getModel(data.model),
+    onStepFinish(step) {
+  console.dir(step, {
+    depth: null,
+  });
+},
     system: `You are Codak, an AI coding assistant running in a terminal (CLI).
 Current working directory: ${cwd}
 ${ragContext ? `\n${ragContext}\n` : ""}

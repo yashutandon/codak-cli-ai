@@ -5,13 +5,17 @@ export async function writeFileTool(
   params: { path: string; content: string },
   cwd: string
 ): Promise<string> {
+
+  console.log("WRITE TOOL CALLED");
+  console.log(params);
+  console.log("cwd:", cwd);
+
   const fullPath = resolve(cwd, params.path);
 
-  try {
-    await mkdir(dirname(fullPath), { recursive: true });
-    await writeFile(fullPath, params.content, "utf-8");
-    return `File written successfully: ${params.path}`;
-  } catch (err: any) {
-    throw new Error(`Failed to write file: ${err.message}`);
-  }
+  console.log("fullPath:", fullPath);
+
+  await mkdir(dirname(fullPath), { recursive: true });
+  await writeFile(fullPath, params.content, "utf-8");
+
+  return `File written successfully: ${params.path}`;
 }
