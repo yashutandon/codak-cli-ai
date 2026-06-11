@@ -2,14 +2,17 @@ import type { NavigateFunction } from "react-router"
 import type { DialogContextValue } from "../../../providers/dialog"
 import type { ToastContextValue } from "../../../providers/toast"
 
+type Mode = "BUILD" | "PLAN"
+
 export type CommandContext = {
   exit: () => void
   toast: ToastContextValue
   dialog: DialogContextValue
   navigate: NavigateFunction
   clearToken: () => Promise<void>
-  sessionId?: string       // current session id 
-  sessionCwd?: string | null  // current session cwd
+  sessionId?: string
+  sessionCwd?: string | null
+  setMode?: (mode: Mode) => void
 }
 
 export type Command = {

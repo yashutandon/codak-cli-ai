@@ -17,16 +17,26 @@ import { useDialog } from "../../providers/dialog"
 import { useTheme } from "../../providers/theme"
 import { clearToken } from "../../auth"
 
+type Mode = "BUILD" | "PLAN"
+
 export type InputBarProps = {
     onSubmit: (text: string) => void
     disabled?: boolean
     statusBar?: StatusBarProps
+    onModeChange?: () => void
+    setMode?: (mode: Mode) => void
+    sessionId?: string
+    sessionCwd?: string | null
 }
 
 export function InputBar({
     onSubmit,
     disabled = false,
     statusBar = {},
+    onModeChange,
+    setMode,
+    sessionId,
+    sessionCwd,
 }: InputBarProps) {
     const [value, setValue] = useState("")
     const [focused, setFocused] = useState(true)
@@ -64,15 +74,16 @@ export function InputBar({
                 dialog,
                 navigate,
                 clearToken,
+                sessionId,
+                sessionCwd,
+                setMode,
             })
         } else {
             textarea.insertText(command.value + "")
         }
-    }, [renderer, toast, dialog, navigate])
+    }, [renderer, toast, dialog, navigate, sessionId, sessionCwd, setMode])
 
-    const handleSelectByCommand = useCallback((_command: string) => {
-        // selectedIndex is managed by useCommandMenu
-    }, [])
+    const handleSelectByCommand = useCallback((_command: string) => {}, [])
 
     const handleCommandExecute = useCallback((_command: string) => {
         const resolved = resolveCommand(selectedIndex)
@@ -85,7 +96,7 @@ export function InputBar({
     const handleTextAreaChange = useCallback((_event: ContentChangeEvent) => {
         const textarea = textareaRef.current
         if (!textarea) return
-        setValue(textarea.plainText)  
+        setValue(textarea.plainText)
         handleContentChange(textarea.plainText)
     }, [handleContentChange])
 
@@ -126,6 +137,10 @@ export function InputBar({
     useKeyboard((key) => {
         const { disabled, focused } = stateRef.current
         if (disabled) return
+        if (key.name === "tab") {
+            onModeChange?.()
+            return
+        }
         if (key.name === "escape") {
             inputRef.current?.clear?.()
             setValue("")

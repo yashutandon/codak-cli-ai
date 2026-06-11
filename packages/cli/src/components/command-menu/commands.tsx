@@ -36,6 +36,32 @@ export const COMMANDS: Command[] = [
     },
   },
 
+  // ── Mode ─────────────────────────────────────────────────────
+  {
+    name: "Build Mode",
+    description: "Switch to BUILD mode — agent writes and executes code",
+    value: "@build",
+    action: (ctx) => {
+      ctx.setMode?.("BUILD")
+      ctx.toast.show({
+        message: "Switched to BUILD mode",
+        variant: "success",
+      })
+    },
+  },
+  {
+    name: "Plan Mode",
+    description: "Switch to PLAN mode — agent analyzes and creates a plan",
+    value: "@plan",
+    action: (ctx) => {
+      ctx.setMode?.("PLAN")
+      ctx.toast.show({
+        message: "Switched to PLAN mode",
+        variant: "success",
+      })
+    },
+  },
+
   // ── Project ──────────────────────────────────────────────────
   {
     name: "Set Path",

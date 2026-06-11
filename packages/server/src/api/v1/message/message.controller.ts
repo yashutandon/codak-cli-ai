@@ -17,7 +17,7 @@ export async function sendMessageHandler(
       return next(new AppError(parsed.error.message, 400));
     }
 
-    const result = await sendMessage(req.params.id, userId, parsed.data);
+    const response = await sendMessage(req.params.id, userId, parsed.data);
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -28,7 +28,21 @@ export async function sendMessageHandler(
       res.write(`data: ${JSON.stringify(event)}\n\n`);
     };
 
-    for await (const chunk of result.fullStream) {
+    // PLAN mode
+    if (response.isPlanner) {
+      const reader = response.planStream.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(decoder.decode(value));
+      }
+      res.end();
+      return;
+    }
+
+    // BUILD mode
+    for await (const chunk of response.result.fullStream) {
       if (chunk.type === "text-delta") {
         write({ type: "text-delta", text: chunk.text });
 

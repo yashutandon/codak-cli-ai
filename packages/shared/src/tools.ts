@@ -51,6 +51,14 @@ export const tools = {
       path: z.string().describe("Directory to search in").default("."),
     }),
   },
+  edit_file: {
+  description: "Edit a file by replacing specific text. Use this instead of write_file when modifying existing files.",
+  parameters: z.object({
+    path: z.string().describe("Path to the file to edit"),
+    old_str: z.string().describe("Exact string to find and replace"),
+    new_str: z.string().describe("String to replace it with"),
+  }),
+},
 } as const;
 
 export type ToolName = keyof typeof tools;
