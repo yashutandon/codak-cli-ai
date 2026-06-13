@@ -8,9 +8,12 @@ export type ToolCallWithResult = ToolCall & {
   pending: boolean;
 };
 
+type Mode = "BUILD" | "PLAN";
+
 type Props = {
   content: string;
   model: string;
+  mode?: Mode;
   toolCalls?: ToolCallWithResult[];
   streaming?: boolean;
   durationMs?: number;
@@ -19,6 +22,7 @@ type Props = {
 const TOOL_LABELS: Record<string, string> = {
   read_file:        "Read file",
   write_file:       "Write file",
+  edit_file:        "Edit file",
   list_files:       "List files",
   run_command:      "Run command",
   create_directory: "Create directory",
@@ -76,7 +80,6 @@ function ToolCallItem({ toolCall }: { toolCall: ToolCallWithResult }) {
   );
 }
 
-// Markdown line types
 type MdLine =
   | { type: "h1" | "h2" | "h3"; text: string }
   | { type: "bullet"; text: string; indent: number }
@@ -105,7 +108,6 @@ function parseLine(line: string): MdLine {
   return { type: "text", text: line };
 }
 
-// Strip inline markdown (**bold**, *italic*, `code`, ~~strike~~)
 function stripInline(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/g, "$1")
@@ -115,7 +117,15 @@ function stripInline(text: string): string {
     .replace(/\[(.+?)\]\(.+?\)/g, "$1");
 }
 
-function MarkdownContent({ content, streaming }: { content: string; streaming: boolean }) {
+function MarkdownContent({
+  content,
+  streaming,
+  mode,
+}: {
+  content: string;
+  streaming: boolean;
+  mode: Mode;
+}) {
   const { colors } = useTheme();
 
   const rawLines = content.split("\n");
@@ -127,7 +137,6 @@ function MarkdownContent({ content, streaming }: { content: string; streaming: b
   lines.forEach((line, i) => {
     const key = String(i);
 
-    // Toggle code block
     if (line.type === "code") {
       inCodeBlock = !inCodeBlock;
       return;
@@ -156,7 +165,7 @@ function MarkdownContent({ content, streaming }: { content: string; streaming: b
 
     if (line.type === "h1") {
       elements.push(
-        <text key={key} fg={colors.primary} attributes={TextAttributes.BOLD}>
+        <text key={key} fg={mode === "PLAN" ? colors.planMode : colors.primary} attributes={TextAttributes.BOLD}>
           {stripInline(line.text)}
         </text>
       );
@@ -200,7 +209,6 @@ function MarkdownContent({ content, streaming }: { content: string; streaming: b
       return;
     }
 
-    // Plain text — last line gets cursor if streaming
     const isLast = i === lines.length - 1;
     const text = stripInline(line.type === "text" ? line.text : "");
     const display = streaming && isLast ? text + "▌" : text;
@@ -212,7 +220,6 @@ function MarkdownContent({ content, streaming }: { content: string; streaming: b
     );
   });
 
-  // Streaming cursor on blank last line
   if (streaming && lines[lines.length - 1]?.type === "blank") {
     elements.push(<text key="cursor">{"▌"}</text>);
   }
@@ -227,15 +234,17 @@ function MarkdownContent({ content, streaming }: { content: string; streaming: b
 export function BotMessage({
   content,
   model,
+  mode = "BUILD",
   toolCalls = [],
   streaming = false,
   durationMs,
 }: Props) {
   const { colors } = useTheme();
 
+  const modeColor = mode === "PLAN" ? colors.planMode : colors.primary;
+
   return (
     <box width="100%" flexDirection="column">
-      {/* Tool calls */}
       {toolCalls.length > 0 && (
         <box flexDirection="column" width="100%" paddingTop={1} gap={0}>
           {toolCalls.map((tc) => (
@@ -244,20 +253,25 @@ export function BotMessage({
         </box>
       )}
 
-      {/* Markdown content */}
       {(content || streaming) && (
         <box paddingY={1} paddingX={3} width="100%">
-          <MarkdownContent content={content} streaming={streaming} />
+          <MarkdownContent content={content} streaming={streaming} mode={mode} />
         </box>
       )}
 
-      {/* Footer */}
       <box paddingX={3} paddingBottom={1} width="100%">
         <box flexDirection="row" gap={2} alignItems="center">
-          <text fg={colors.primary}>◉</text>
+          <text fg={modeColor}>
+            {mode === "PLAN" ? "◈" : "◉"}
+          </text>
           <text fg={colors.dimSeparator} attributes={TextAttributes.DIM}>
             {model}
           </text>
+          {mode === "PLAN" && (
+            <text fg={colors.planMode} attributes={TextAttributes.DIM}>
+              · plan
+            </text>
+          )}
           {durationMs !== undefined ? (
             <text fg={colors.dimSeparator} attributes={TextAttributes.DIM}>
               {"· " + prettyMs(durationMs)}

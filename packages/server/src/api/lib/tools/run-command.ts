@@ -1,8 +1,8 @@
 import { exec } from "child_process";
 import { promisify } from "util";
+import { runInContainer, isDockerAvailable } from "../../infra/docker/container-manager";
 
 const execAsync = promisify(exec);
-
 const TIMEOUT_MS = 30_000;
 const MAX_OUTPUT_LENGTH = 10_000;
 
@@ -15,9 +15,20 @@ const BLOCKED_COMMANDS = [
   /dd\s+if=/,
 ];
 
+let dockerAvailable: boolean | null = null;
+
+async function checkDocker(): Promise<boolean> {
+  if (dockerAvailable === null) {
+    dockerAvailable = await isDockerAvailable();
+    console.log(`[Docker] Available: ${dockerAvailable}`);
+  }
+  return dockerAvailable;
+}
+
 export async function runCommandTool(
   params: { command: string },
-  cwd: string
+  cwd: string,
+  sessionId?: string
 ): Promise<string> {
   const { command } = params;
 
@@ -27,6 +38,17 @@ export async function runCommandTool(
     }
   }
 
+  // Docker available + sessionId hai → container mein chalao
+  if (sessionId && await checkDocker()) {
+    try {
+      return await runInContainer(sessionId, cwd, command);
+    } catch (err: any) {
+      // Docker fail → fallback to host
+      console.warn(`[Docker] Falling back to host: ${err.message}`);
+    }
+  }
+
+  // Host fallback
   try {
     const { stdout, stderr } = await execAsync(command, {
       cwd,

@@ -1,110 +1,62 @@
-import { streamText, stepCountIs, tool } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
-import { google } from "@ai-sdk/google";
-import { createGroq } from "@ai-sdk/groq";
-import { openai } from "@ai-sdk/openai";
+import { streamText, stepCountIs, tool, type StreamTextResult } from "ai";
 import { db } from "@codak/database";
-import { findSupportedChatModel, tools as toolDefinitions } from "@codak/shared";
+import { tools as toolDefinitions, type ToolName } from "@codak/shared";
 import { AppError } from "../../../utils/AppError";
 import { redis } from "../../infra";
 import { executeTool } from "../../lib/tools";
 import type { SendMessageDto } from "./message.dto";
 import { getIndexingStatus, retrieveRelevantChunks } from "../../infra/embeddings";
+import { getSystemPrompt } from "../../lib/constants/system-prompt";
+import { detectPackageManager } from "../../lib/tools/build/detect-package-manager";
+import { getModel } from "../../model/get-model";
+import { runMultiAgent, runPlanner } from "../../service/planner.service";
+import { updateProjectMemory, buildMemoryContext } from "../../service/project-memory";
 
-const groq = createGroq({ apiKey: process.env.GROQ_API_KEY });
 const SESSION_CACHE_TTL = 60 * 5;
 
-function getModel(modelId: string) {
-  const found = findSupportedChatModel(modelId) as
-    | { id: string; provider: string }
-    | undefined;
-  if (!found) throw new AppError(`Unsupported model: ${modelId}`, 400);
+type PlanResponse = {
+  isPlanner: true;
+  planStream: ReadableStream;
+  result?: never;
+};
 
-  switch (found.provider) {
-    case "anthropic": return anthropic(modelId as Parameters<typeof anthropic>[0]);
-    case "google": return google(modelId as Parameters<typeof google>[0]);
-    case "groq": return groq(modelId);
-    case "openai": return openai(modelId as Parameters<typeof openai>[0]);
-    default: throw new AppError(`Unsupported provider: ${found.provider}`, 400);
-  }
-}
+type BuildResponse = {
+  isPlanner: false;
+  result: StreamTextResult<any, any>;
+  planStream?: never;
+};
 
-async function getSessionWithCache(sessionId: string, userId: string) {
-  const cacheKey = `session:${sessionId}:${userId}`;
-  const cached = await redis.get(cacheKey);
-  if (cached) return JSON.parse(cached);
-
-  const session = await db.session.findFirst({
-    where: { id: sessionId, userId },
-    include: {
-      messages: {
-        orderBy: { createdAt: "asc" }, // ← FIX: asc order, no reverse needed
-        take: 10,
-      },
-    },
-  });
-
-  if (session) {
-    await redis.setex(cacheKey, SESSION_CACHE_TTL, JSON.stringify(session));
-  }
-
-  return session;
-}
+type MessageResponse = PlanResponse | BuildResponse;
 
 async function invalidateSessionCache(sessionId: string, userId: string) {
   await redis.del(`session:${sessionId}:${userId}`);
 }
 
-function buildTools(cwd: string) {
+
+
+function buildTools(cwd: string, sessionId: string) {
+  
+  const makeExecute = (name: ToolName) => async (args: Record<string, unknown>) =>
+    executeTool(name, args, cwd, sessionId);
+
   return {
-    read_file: tool({
-      description: toolDefinitions.read_file.description,
-      inputSchema: toolDefinitions.read_file.parameters,
-      execute: async (args) =>
-        executeTool("read_file", args, cwd),
-    }),
+    // File tools
+    read_file:        tool({ description: toolDefinitions.read_file.description,        inputSchema: toolDefinitions.read_file.parameters,        execute: makeExecute("read_file") }),
+    write_file:       tool({ description: toolDefinitions.write_file.description,       inputSchema: toolDefinitions.write_file.parameters,       execute: makeExecute("write_file") }),
+    edit_file:        tool({ description: toolDefinitions.edit_file.description,        inputSchema: toolDefinitions.edit_file.parameters,        execute: makeExecute("edit_file") }),
+    list_files:       tool({ description: toolDefinitions.list_files.description,       inputSchema: toolDefinitions.list_files.parameters,       execute: makeExecute("list_files") }),
+    run_command:      tool({ description: toolDefinitions.run_command.description,      inputSchema: toolDefinitions.run_command.parameters,      execute: makeExecute("run_command") }),
+    create_directory: tool({ description: toolDefinitions.create_directory.description, inputSchema: toolDefinitions.create_directory.parameters, execute: makeExecute("create_directory") }),
+    delete_file:      tool({ description: toolDefinitions.delete_file.description,      inputSchema: toolDefinitions.delete_file.parameters,      execute: makeExecute("delete_file") }),
+    search_files:     tool({ description: toolDefinitions.search_files.description,     inputSchema: toolDefinitions.search_files.parameters,     execute: makeExecute("search_files") }),
 
-    write_file: tool({
-      description: toolDefinitions.write_file.description,
-      inputSchema: toolDefinitions.write_file.parameters,
-      execute: async (args) =>
-        executeTool("write_file", args, cwd),
-    }),
-
-    list_files: tool({
-      description: toolDefinitions.list_files.description,
-      inputSchema: toolDefinitions.list_files.parameters,
-      execute: async (args) =>
-        executeTool("list_files", args, cwd),
-    }),
-
-    run_command: tool({
-      description: toolDefinitions.run_command.description,
-      inputSchema: toolDefinitions.run_command.parameters,
-      execute: async (args) =>
-        executeTool("run_command", args, cwd),
-    }),
-
-    create_directory: tool({
-      description: toolDefinitions.create_directory.description,
-      inputSchema: toolDefinitions.create_directory.parameters,
-      execute: async (args) =>
-        executeTool("create_directory", args, cwd),
-    }),
-
-    delete_file: tool({
-      description: toolDefinitions.delete_file.description,
-      inputSchema: toolDefinitions.delete_file.parameters,
-      execute: async (args) =>
-        executeTool("delete_file", args, cwd),
-    }),
-
-    search_files: tool({
-      description: toolDefinitions.search_files.description,
-      inputSchema: toolDefinitions.search_files.parameters,
-      execute: async (args) =>
-        executeTool("search_files", args, cwd),
-    }),
+    // Git tools
+    git_status:        tool({ description: toolDefinitions.git_status.description,        inputSchema: toolDefinitions.git_status.parameters,        execute: makeExecute("git_status") }),
+    git_diff:          tool({ description: toolDefinitions.git_diff.description,          inputSchema: toolDefinitions.git_diff.parameters,          execute: makeExecute("git_diff") }),
+    git_commit:        tool({ description: toolDefinitions.git_commit.description,        inputSchema: toolDefinitions.git_commit.parameters,        execute: makeExecute("git_commit") }),
+    git_checkout:      tool({ description: toolDefinitions.git_checkout.description,      inputSchema: toolDefinitions.git_checkout.parameters,      execute: makeExecute("git_checkout") }),
+    git_log:           tool({ description: toolDefinitions.git_log.description,           inputSchema: toolDefinitions.git_log.parameters,           execute: makeExecute("git_log") }),
+    git_create_branch: tool({ description: toolDefinitions.git_create_branch.description, inputSchema: toolDefinitions.git_create_branch.parameters, execute: makeExecute("git_create_branch") }),
   };
 }
 
@@ -112,25 +64,24 @@ export async function sendMessage(
   sessionId: string,
   userId: string,
   data: SendMessageDto
-) {
-  // FIX: pehle cache invalidate, phir session fetch
+): Promise<MessageResponse> {
   await invalidateSessionCache(sessionId, userId);
 
   const session = await db.session.findFirst({
     where: { id: sessionId, userId },
     include: {
-      messages: {
-        orderBy: { createdAt: "asc" }, // ← FIX: asc
-        take: 10,
-      },
+      messages: { orderBy: { createdAt: "asc" }, take: 10 },
     },
   });
 
   if (!session) throw new AppError("Session not found", 404);
 
   const cwd = session.cwd ?? process.cwd();
+  const pm = await detectPackageManager(cwd);
 
-  // User message save karo
+  await updateProjectMemory(sessionId, { packageManager: pm.name });
+  const memoryContext = await buildMemoryContext(sessionId);
+
   await db.message.create({
     data: {
       sessionId,
@@ -143,7 +94,6 @@ export async function sendMessage(
     },
   });
 
-  // History build karo — REMOVED enrichUserMessage (ye bug tha)
   const history = session.messages
     .filter((m: any) => m.content?.trim())
     .map((m: any) => ({
@@ -151,7 +101,6 @@ export async function sendMessage(
       content: m.content,
     }));
 
-  // RAG context
   let ragContext = "";
   const indexingStatus = getIndexingStatus(sessionId);
   if (indexingStatus === "done") {
@@ -162,40 +111,100 @@ export async function sendMessage(
     }
   }
 
+  const fullRagContext = [ragContext, memoryContext].filter(Boolean).join("\n\n");
+
+  // PLAN mode
+  if (data.mode === "PLAN") {
+    const plan = await runPlanner(
+      data.content,
+      cwd,
+      fullRagContext,
+      data.model,
+      history
+    );
+
+    await db.message.create({
+      data: {
+        sessionId,
+        role: "ASSISTANT",
+        content: plan,
+        mode: data.mode,
+        model: data.model,
+        status: "COMPLETE",
+        title: "",
+      },
+    });
+
+    await invalidateSessionCache(sessionId, userId);
+
+    const encoder = new TextEncoder();
+    const planStream = new ReadableStream({
+      start(controller) {
+        const lines = plan.split("\n");
+        for (const line of lines) {
+          const chunk = JSON.stringify({ type: "text-delta", text: line + "\n" });
+          controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+        }
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`)
+        );
+        controller.close();
+      },
+    });
+
+    return { isPlanner: true, planStream };
+  }
+
+  // BUILD mode
+
+
+  const isComplex = /build|implement|create|add|setup|integrate|refactor|migrate|scaffold/i.test(data.content)
+  && data.content.trim().split(/\s+/).length >= 5;
+
+if (isComplex) {
+  const multiAgentResult = await runMultiAgent(
+    data.content,
+    cwd,
+    fullRagContext,
+    data.model,
+    history
+  );
+
+  await db.message.create({
+    data: {
+      sessionId,
+      role: "ASSISTANT",
+      content: multiAgentResult,
+      mode: data.mode,
+      model: data.model,
+      status: "COMPLETE",
+      title: "",
+    },
+  });
+
+  await invalidateSessionCache(sessionId, userId);
+
+  const encoder = new TextEncoder();
+  const multiStream = new ReadableStream({
+    start(controller) {
+      const lines = multiAgentResult.split("\n");
+      for (const line of lines) {
+        const chunk = JSON.stringify({ type: "text-delta", text: line + "\n" });
+        controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
+      controller.close();
+    },
+  });
+
+  return { isPlanner: true, planStream: multiStream };
+}
+
   const result = streamText({
     model: getModel(data.model),
-    onStepFinish(step) {
-  console.dir(step, {
-    depth: null,
-  });
-},
-    system: `You are Codak, an AI coding assistant running in a terminal (CLI).
-Current working directory: ${cwd}
-${ragContext ? `\n${ragContext}\n` : ""}
-
-You have access to file system tools. Use them IMMEDIATELY and DIRECTLY — never ask for confirmation.
-
-TOOL USAGE RULES:
-- "write a file" / "create a file" / "make a file" → call write_file tool RIGHT NOW with path and content
-- "read a file" / "show file contents" / "open file" → call read_file tool RIGHT NOW
-- "list files" / "what's in this folder" / "show directory" → call list_files tool RIGHT NOW  
-- "run" / "execute" / "install" → call run_command tool RIGHT NOW
-- "delete" / "remove a file" → call delete_file tool RIGHT NOW
-- "search" / "find files" → call search_files tool RIGHT NOW
-
-PARSING RULES for write_file:
-- "write X to Y" → path=Y, content=X
-- "create file Y with content X" → path=Y, content=X  
-- "filename: Y, content: X" → path=Y, content=X
-- "Y/X" where Y looks like filename → path=Y (before slash), content=X (after slash)
-
-CRITICAL:
-- NEVER say "I couldn't pass the args correctly" — just call the tool
-- NEVER ask user to resend in a different format
-- NEVER confirm before writing — just do it
-- After tool call, show the result in text`,
+    system: getSystemPrompt(cwd, fullRagContext, pm.name),
     messages: [...history, { role: "user" as const, content: data.content }],
-    tools: buildTools(cwd),
+    tools: buildTools(cwd, sessionId),
     // @ts-ignore
     stopWhen: stepCountIs(10),
     onFinish: async ({ text, steps }) => {
@@ -223,5 +232,5 @@ CRITICAL:
     },
   });
 
-  return result;
+  return { isPlanner: false, result };
 }

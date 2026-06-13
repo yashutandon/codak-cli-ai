@@ -5,6 +5,8 @@ import { clearToken } from "../../auth"
 import { updateSessionCwd } from "../../clients/create-session/session.api"
 import type { Command } from "./types/command.types"
 import { HelpDialogContent } from "./help-dialog"
+import { ModelDialogContent } from "./model-dialog"
+import { DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@codak/shared"
 
 export const COMMANDS: Command[] = [
   // ── Conversation ─────────────────────────────────────────────
@@ -28,11 +30,60 @@ export const COMMANDS: Command[] = [
     },
   },
   {
+    name: "Switch Model",
+    description: "Select AI model to use",
+    value: "@models",
+    action: (ctx) => {
+      ctx.dialog.open({
+        title: "Select Model",
+        children: (
+          <ModelDialogContent
+            currentModel={ctx.currentModel ?? DEFAULT_CHAT_MODEL_ID}
+            onSelect={(modelId: SupportedChatModelId) => {
+              ctx.setModel?.(modelId)
+              ctx.dialog.close()
+              ctx.toast.show({
+                message: `Model: ${modelId}`,
+                variant: "success",
+              })
+            }}
+          />
+        ),
+      })
+    },
+  },
+  {
     name: "Close Conversation",
     description: "Go back to home screen",
     value: "@close",
     action: (ctx) => {
       ctx.navigate("/", { replace: true })
+    },
+  },
+
+  // ── Mode ─────────────────────────────────────────────────────
+  {
+    name: "Build Mode",
+    description: "Switch to BUILD mode — agent writes and executes code",
+    value: "@build",
+    action: (ctx) => {
+      ctx.setMode?.("BUILD")
+      ctx.toast.show({
+        message: "Switched to BUILD mode",
+        variant: "success",
+      })
+    },
+  },
+  {
+    name: "Plan Mode",
+    description: "Switch to PLAN mode — agent analyzes and creates a plan",
+    value: "@plan",
+    action: (ctx) => {
+      ctx.setMode?.("PLAN")
+      ctx.toast.show({
+        message: "Switched to PLAN mode",
+        variant: "success",
+      })
     },
   },
 
