@@ -124,7 +124,7 @@ This means the agent always has up-to-date context about the files it just modif
 ### Installation
 
 ```bash
-git clone https://github.com/<your-username>/codak-cli-ai.git
+git clone https://github.com/yashutandon/codak-cli-ai.git
 cd codak-cli-ai
 bun install
 ```
