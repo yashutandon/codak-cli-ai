@@ -52,7 +52,7 @@ export function ChatShell({
         <InputBar
           onSubmit={onSubmit}
           disabled={inputDisabled}
-          statusBar={{ model }}
+          statusBar={{ model ,interactionMode: mode}}
           onModeChange={() => onModeChange?.(mode === "BUILD" ? "PLAN" : "BUILD")}
           setMode={onModeChange}
           setModel={onModelChange}

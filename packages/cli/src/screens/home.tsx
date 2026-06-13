@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router";
 import { TextAttributes } from "@opentui/core";
-import { useKeyboard } from "@opentui/react";
 import { useTheme } from "../providers/theme";
 import { InputBar } from "../components/cli-input/input-bar";
 import { Header } from "../components/layout/header";
-import { getAllSessions } from "../clients/create-session/session.api";
+import { DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@codak/shared";
 import type { Session } from "../clients/create-session/session.types";
+
+type Mode = "BUILD" | "PLAN";
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -15,7 +16,6 @@ function formatDate(dateStr: string): string {
   const mins = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
-
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
   if (hours < 24) return `${hours}h ago`;
@@ -26,16 +26,16 @@ function formatDate(dateStr: string): string {
 export function Home() {
   const navigate = useNavigate();
   const { colors } = useTheme();
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-
-
+  const [sessions] = useState<Session[]>([]);
+  const [selectedIndex] = useState(0);
+  const [model, setModel] = useState<SupportedChatModelId>(DEFAULT_CHAT_MODEL_ID);
+  const [mode, setMode] = useState<Mode>("BUILD");
 
   const handleSubmit = useCallback(
     (text: string) => {
-      navigate("/session/new", { state: { message: text } });
+      navigate("/session/new", { state: { message: text, model } });
     },
-    [navigate]
+    [navigate, model]
   );
 
   return (
@@ -47,7 +47,6 @@ export function Home() {
           <text fg={colors.primary} attributes={TextAttributes.DIM}>
             Recent Sessions
           </text>
-
           <box flexDirection="column" width="100%" marginTop={1}>
             {sessions.slice(0, 8).map((session, index) => (
               <box
@@ -56,21 +55,13 @@ export function Home() {
                 flexDirection="row"
                 gap={2}
                 paddingX={1}
-                backgroundColor={
-                  selectedIndex === index ? colors.surface : undefined
-                }
+                backgroundColor={selectedIndex === index ? colors.surface : undefined}
               >
-                <text fg={colors.primary}>
-                  {selectedIndex === index ? "›" : " "}
-                </text>
+                <text fg={colors.primary}>{selectedIndex === index ? "›" : " "}</text>
                 <text fg={colors.primary} flexGrow={1}>
-                  {session.title.length > 50
-                    ? session.title.slice(0, 50) + "..."
-                    : session.title}
+                  {session.title.length > 50 ? session.title.slice(0, 50) + "..." : session.title}
                 </text>
-                <text attributes={TextAttributes.DIM}>
-                  {formatDate(session.createdAt)}
-                </text>
+                <text attributes={TextAttributes.DIM}>{formatDate(session.createdAt)}</text>
               </box>
             ))}
           </box>
@@ -78,7 +69,14 @@ export function Home() {
       )}
 
       <box width="100%">
-        <InputBar onSubmit={handleSubmit} />
+        <InputBar
+          onSubmit={handleSubmit}
+          currentModel={model}
+          setModel={setModel}
+          setMode={(m) => setMode(m)}
+          onModeChange={() => setMode(mode === "BUILD" ? "PLAN" : "BUILD")}
+          statusBar={{ model, interactionMode: mode }}
+        />
       </box>
     </box>
   );

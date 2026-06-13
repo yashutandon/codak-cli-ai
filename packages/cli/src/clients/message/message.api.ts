@@ -1,11 +1,10 @@
-import { getToken } from "../../auth";
 import { appendFileSync } from "fs";
+import { apiFetch, BASE_URL } from "../api";
+import { getToken, clearToken, ensureAuthenticated } from "../../auth";
 
 function log(msg: string) {
   appendFileSync("C:/tmp/codak-debug.log", msg + "\n");
 }
-
-const BASE_URL = "http://localhost:3001/api/v1";
 
 export type ToolCall = {
   toolCallId: string;
@@ -17,14 +16,6 @@ export type ToolResult = {
   toolCallId: string;
   result: string;
 };
-
-async function getAuthHeaders(): Promise<HeadersInit> {
-  const token = await getToken();
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
 
 export async function sendMessage(
   sessionId: string,
@@ -40,11 +31,26 @@ export async function sendMessage(
   try {
     log(`[sendMessage] called — sessionId=${sessionId} content=${content.slice(0, 30)}`);
 
-    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/messages`, {
+    let res = await apiFetch(`/sessions/${sessionId}/messages`, {
       method: "POST",
-      headers: await getAuthHeaders(),
       body: JSON.stringify({ content, model, mode }),
     });
+
+    // 401 already handled by apiFetch — but double check
+    if (res.status === 401) {
+      log(`[sendMessage] 401 after retry — re-authenticating`);
+      await clearToken();
+      await ensureAuthenticated();
+      const token = await getToken();
+      res = await fetch(`${BASE_URL}/sessions/${sessionId}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ content, model, mode }),
+      });
+    }
 
     log(`[sendMessage] response status=${res.status}`);
 

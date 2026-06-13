@@ -5,14 +5,12 @@ import { UserMessage } from "../components/messages/user-message";
 import { BotMessage } from "../components/messages/bot-message";
 import { ChatShell } from "../components/chat-shell/shell";
 import { createSession } from "../clients/create-session/session.api";
-import { DEFAULT_CHAT_MODEL_ID } from "@codak/shared";
+import { DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@codak/shared";
 
 const newChatStateSchema = z.object({
   message: z.string(),
+  model: z.string().optional(),
 });
-
-
-const MODEL=DEFAULT_CHAT_MODEL_ID
 
 export function NewChat() {
   const navigate = useNavigate();
@@ -24,10 +22,10 @@ export function NewChat() {
     return parsed.success ? parsed.data : null;
   }, [location.state]);
 
+  const model = (state?.model as SupportedChatModelId) ?? DEFAULT_CHAT_MODEL_ID;
+
   useEffect(() => {
-    if (!state) {
-      navigate("/", { replace: true });
-    }
+    if (!state) navigate("/", { replace: true });
   }, [state, navigate]);
 
   useEffect(() => {
@@ -45,7 +43,7 @@ export function NewChat() {
             role: "USER",
             content: state.message,
             mode: "BUILD",
-            model: MODEL,
+            model,
           },
         });
 
@@ -53,36 +51,29 @@ export function NewChat() {
 
         navigate(`/session/${session.id}`, {
           replace: true,
-          state: { session },
+          state: { session, model },
         });
       } catch (error) {
         if (ignore) return;
-
         navigate("/", {
           replace: true,
           state: {
-            error:
-              error instanceof Error
-                ? error.message
-                : "Failed to create session",
+            error: error instanceof Error ? error.message : "Failed to create session",
           },
         });
       }
     };
 
     create();
-
-    return () => {
-      ignore = true;
-    };
-  }, [state, navigate]);
+    return () => { ignore = true; };
+  }, [state, navigate, model]);
 
   if (!state) return null;
 
   return (
     <ChatShell onSubmit={() => {}} inputDisabled loading>
       <UserMessage message={state.message} />
-      <BotMessage content="" model={MODEL} />
+      <BotMessage content="" model={model} />
     </ChatShell>
   );
 }

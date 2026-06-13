@@ -16,7 +16,12 @@ export const CreateSessionSchema = z.object({
   }).optional(),
 });
 
+export const UpdateSessionCwdSchema = z.object({
+  cwd: z.string().min(1, "Path cannot be empty"),
+});
+
 export type CreateSessionDto = z.infer<typeof CreateSessionSchema>;
+export type UpdateSessionCwdDto = z.infer<typeof UpdateSessionCwdSchema>;
 
 export type Role = z.infer<typeof RoleSchema>;
 export type Mode = z.infer<typeof ModeSchema>;

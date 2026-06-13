@@ -94,7 +94,7 @@ export const SUPPORTED_CHAT_MODELS = [
         pricing: { inputUsedMillionTokens: 0, outputUsedMillionTokens: 0 },
     },
     {
-        id: "mixtral-8x7b-32768",
+        id: "qwen/qwen3-32b",
         provider: "groq",
         pricing: { inputUsedMillionTokens: 0, outputUsedMillionTokens: 0 },
     },

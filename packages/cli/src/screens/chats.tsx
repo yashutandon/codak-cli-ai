@@ -15,6 +15,7 @@ const sessionLocationSchema = z.object({
   session: z.custom<Session>(
     (val) => val != null && typeof val === "object" && "id" in val
   ),
+  model: z.string().optional(),
 });
 
 type Mode = "BUILD" | "PLAN";
@@ -44,7 +45,9 @@ export function Chat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("BUILD");
-  const [model, setModel] = useState<SupportedChatModelId>(DEFAULT_CHAT_MODEL_ID);
+  const [model, setModel] = useState<SupportedChatModelId>(
+    (prefetched?.model as SupportedChatModelId) ?? DEFAULT_CHAT_MODEL_ID
+  );
 
   const autoTriggeredRef = useRef(false);
 
@@ -54,6 +57,7 @@ export function Chat() {
     setStreamingTurn(null);
     setIsStreaming(false);
     setError(null);
+    setModel((prefetched?.model as SupportedChatModelId) ?? DEFAULT_CHAT_MODEL_ID);
     autoTriggeredRef.current = false;
   }, [id]);
 

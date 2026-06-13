@@ -1,8 +1,6 @@
 import { generateText, streamText, stepCountIs, tool } from "ai";
 import { getModel } from "../model/get-model";
 import { runOrchestrator, runCodingAgent, runReviewAgent } from "../infra/agents/index"
-import { executeTool } from "../lib/tools";
-import { tools as toolDefinitions, type ToolName } from "@codak/shared";
 
 export async function runPlanner(
   userMessage: string,

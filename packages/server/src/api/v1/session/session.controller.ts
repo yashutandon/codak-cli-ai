@@ -4,8 +4,9 @@ import {
   getAllSessions,
   getSessionById,
   createSession,
+  updateSessionCwd,
 } from "./session.service";
-import { CreateSessionSchema } from "./session.dto";
+import { CreateSessionSchema, UpdateSessionCwdSchema } from "./session.dto";
 import { AppError } from "../../../utils/AppError";
 
 export async function getAll(
@@ -16,11 +17,7 @@ export async function getAll(
   try {
     const userId = (req as AuthRequest).userId;
     const sessions = await getAllSessions(userId);
-
-    res.status(200).json({
-      success: true,
-      data: sessions,
-    });
+    res.status(200).json({ success: true, data: sessions });
   } catch (err) {
     next(err);
   }
@@ -35,14 +32,9 @@ export async function getById(
     const userId = (req as unknown as AuthRequest).userId;
     const session = await getSessionById(req.params.id, userId);
 
-    if (!session) {
-      return next(new AppError("Session not found", 404));
-    }
+    if (!session) return next(new AppError("Session not found", 404));
 
-    res.status(200).json({
-      success: true,
-      data: session,
-    });
+    res.status(200).json({ success: true, data: session });
   } catch (err) {
     next(err);
   }
@@ -62,11 +54,27 @@ export async function create(
     }
 
     const session = await createSession(parsed.data, userId);
+    res.status(201).json({ success: true, data: session });
+  } catch (err) {
+    next(err);
+  }
+}
 
-    res.status(201).json({
-      success: true,
-      data: session,
-    });
+export async function updateCwd(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = (req as unknown as AuthRequest).userId;
+    const parsed = UpdateSessionCwdSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return next(new AppError(parsed.error.message, 400));
+    }
+
+    const session = await updateSessionCwd(req.params.id, userId, parsed.data.cwd);
+    res.status(200).json({ success: true, data: session });
   } catch (err) {
     next(err);
   }
