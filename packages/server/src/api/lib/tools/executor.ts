@@ -10,6 +10,14 @@ import { validateToolCall } from "./validate-toolcall";
 import { db } from "@codak/database";
 import type { ToolName } from "@codak/shared";
 import { triggerReindex } from "../../infra/embeddings";
+import {
+  gitStatusTool,
+  gitDiffTool,
+  gitCommitTool,
+  gitCheckoutTool,
+  gitLogTool,
+  gitCreateBranchTool,
+} from "./git";
 
 export async function executeTool(
   name: ToolName,
@@ -27,14 +35,23 @@ export async function executeTool(
 
   try {
     switch (name) {
-      case "read_file": result = await readFileTool(args as any, cwd); break;
-      case "write_file": result = await writeFileTool(args as any, cwd); break;
-      case "edit_file": result = await editFileTool(args as any, cwd); break;
-      case "list_files": result = await listFilesTool(args as any, cwd); break;
-      case "run_command": result = await runCommandTool(args as any, cwd); break;
+      case "read_file":        result = await readFileTool(args as any, cwd); break;
+      case "write_file":       result = await writeFileTool(args as any, cwd); break;
+      case "edit_file":        result = await editFileTool(args as any, cwd); break;
+      case "list_files":       result = await listFilesTool(args as any, cwd); break;
+      case "run_command":      result = await runCommandTool(args as any, cwd); break;
       case "create_directory": result = await createDirectoryTool(args as any, cwd); break;
-      case "delete_file": result = await deleteFileTool(args as any, cwd); break;
-      case "search_files": result = await searchFilesTool(args as any, cwd); break;
+      case "delete_file":      result = await deleteFileTool(args as any, cwd); break;
+      case "search_files":     result = await searchFilesTool(args as any, cwd); break;
+
+      // Git tools
+      case "git_status":        result = await gitStatusTool(cwd); break;
+      case "git_diff":          result = await gitDiffTool(args as any, cwd); break;
+      case "git_commit":        result = await gitCommitTool(args as any, cwd); break;
+      case "git_checkout":      result = await gitCheckoutTool(args as any, cwd); break;
+      case "git_log":           result = await gitLogTool(args as any, cwd); break;
+      case "git_create_branch": result = await gitCreateBranchTool(args as any, cwd); break;
+
       default: throw new Error(`Unknown tool: ${name}`);
     }
   } catch (err: any) {
@@ -76,4 +93,3 @@ export async function executeTool(
 
   return result;
 }
-

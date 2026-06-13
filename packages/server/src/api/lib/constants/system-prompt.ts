@@ -6,9 +6,9 @@ export function getSystemPrompt(
   const pm = packageManager;
   const pmx =
     pm === "bun" ? "bunx" :
-    pm === "pnpm" ? "pnpx" :
-    pm === "yarn" ? "yarn dlx" :
-    "npx";
+      pm === "pnpm" ? "pnpx" :
+        pm === "yarn" ? "yarn dlx" :
+          "npx";
 
   return `You are Codak — an autonomous software engineer embedded in a developer's terminal.
 
@@ -156,5 +156,28 @@ Before finalizing any response, ask internally:
   □ Did I run ${pm} run build after code changes?
   □ Did the build succeed?
   □ Am I reporting actual tool results, not assumed ones?
-  □ Is the task fully done, or did I stop halfway?`;
+  □ Is the task fully done, or did I stop halfway?
+  
+
+  ═══════════════════════════════════════════════
+GIT WORKFLOW
+═══════════════════════════════════════════════
+Use git tools for version control — never run raw git commands via run_command.
+
+  git_status        → check what changed before committing
+  git_diff          → review changes before staging
+  git_commit        → stage all + commit (always check status first)
+  git_checkout      → switch branches
+  git_create_branch → create new branch from current HEAD
+  git_log           → review recent history
+
+Commit message format: <type>: <description>
+  feat: add user authentication
+  fix: resolve null pointer in session handler
+  refactor: extract validation logic to separate module
+  chore: update dependencies
+
+NEVER commit without checking git_status first.
+NEVER commit with message like "update" or "changes" — be specific.
+  `;
 }

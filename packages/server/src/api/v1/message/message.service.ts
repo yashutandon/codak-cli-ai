@@ -37,6 +37,7 @@ function buildTools(cwd: string, sessionId: string) {
     executeTool(name, args, cwd, sessionId);
 
   return {
+    // File tools
     read_file:        tool({ description: toolDefinitions.read_file.description,        inputSchema: toolDefinitions.read_file.parameters,        execute: makeExecute("read_file") }),
     write_file:       tool({ description: toolDefinitions.write_file.description,       inputSchema: toolDefinitions.write_file.parameters,       execute: makeExecute("write_file") }),
     edit_file:        tool({ description: toolDefinitions.edit_file.description,        inputSchema: toolDefinitions.edit_file.parameters,        execute: makeExecute("edit_file") }),
@@ -45,6 +46,14 @@ function buildTools(cwd: string, sessionId: string) {
     create_directory: tool({ description: toolDefinitions.create_directory.description, inputSchema: toolDefinitions.create_directory.parameters, execute: makeExecute("create_directory") }),
     delete_file:      tool({ description: toolDefinitions.delete_file.description,      inputSchema: toolDefinitions.delete_file.parameters,      execute: makeExecute("delete_file") }),
     search_files:     tool({ description: toolDefinitions.search_files.description,     inputSchema: toolDefinitions.search_files.parameters,     execute: makeExecute("search_files") }),
+
+    // Git tools
+    git_status:        tool({ description: toolDefinitions.git_status.description,        inputSchema: toolDefinitions.git_status.parameters,        execute: makeExecute("git_status") }),
+    git_diff:          tool({ description: toolDefinitions.git_diff.description,          inputSchema: toolDefinitions.git_diff.parameters,          execute: makeExecute("git_diff") }),
+    git_commit:        tool({ description: toolDefinitions.git_commit.description,        inputSchema: toolDefinitions.git_commit.parameters,        execute: makeExecute("git_commit") }),
+    git_checkout:      tool({ description: toolDefinitions.git_checkout.description,      inputSchema: toolDefinitions.git_checkout.parameters,      execute: makeExecute("git_checkout") }),
+    git_log:           tool({ description: toolDefinitions.git_log.description,           inputSchema: toolDefinitions.git_log.parameters,           execute: makeExecute("git_log") }),
+    git_create_branch: tool({ description: toolDefinitions.git_create_branch.description, inputSchema: toolDefinitions.git_create_branch.parameters, execute: makeExecute("git_create_branch") }),
   };
 }
 
