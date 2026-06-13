@@ -16,18 +16,21 @@ import { useKeyboardLayer } from "../../providers/keyboard-layers"
 import { useDialog } from "../../providers/dialog"
 import { useTheme } from "../../providers/theme"
 import { clearToken } from "../../auth"
+import type { SupportedChatModelId } from "@codak/shared"
 
 type Mode = "BUILD" | "PLAN"
-
 export type InputBarProps = {
     onSubmit: (text: string) => void
     disabled?: boolean
     statusBar?: StatusBarProps
     onModeChange?: () => void
     setMode?: (mode: Mode) => void
+    setModel?: (modelId: SupportedChatModelId) => void
+    currentModel?: SupportedChatModelId
     sessionId?: string
     sessionCwd?: string | null
 }
+
 
 export function InputBar({
     onSubmit,
@@ -35,6 +38,8 @@ export function InputBar({
     statusBar = {},
     onModeChange,
     setMode,
+    setModel,
+    currentModel,
     sessionId,
     sessionCwd,
 }: InputBarProps) {
@@ -63,27 +68,29 @@ export function InputBar({
     const dialog = useDialog()
     const { colors } = useTheme()
 
-    const handleCommand = useCallback((command: Command | undefined) => {
-        const textarea = textareaRef.current
-        if (!command || !textarea) return
-        textarea.setText("")
-        if (command.action) {
-            command.action({
-                exit: () => renderer.destroy(),
-                toast,
-                dialog,
-                navigate,
-                clearToken,
-                sessionId,
-                sessionCwd,
-                setMode,
-            })
-        } else {
-            textarea.insertText(command.value + "")
-        }
-    }, [renderer, toast, dialog, navigate, sessionId, sessionCwd, setMode])
+const handleCommand = useCallback((command: Command | undefined) => {
+    const textarea = textareaRef.current
+    if (!command || !textarea) return
+    textarea.setText("")
+    if (command.action) {
+        command.action({
+            exit: () => renderer.destroy(),
+            toast,
+            dialog,
+            navigate,
+            clearToken,
+            sessionId,
+            sessionCwd,
+            setMode,
+            currentModel,
+            setModel,
+        })
+    } else {
+        textarea.insertText(command.value + "")
+    }
+}, [renderer, toast, dialog, navigate, sessionId, sessionCwd, setMode, currentModel, setModel]) 
 
-    const handleSelectByCommand = useCallback((_command: string) => {}, [])
+    const handleSelectByCommand = useCallback((_command: string) => { }, [])
 
     const handleCommandExecute = useCallback((_command: string) => {
         const resolved = resolveCommand(selectedIndex)

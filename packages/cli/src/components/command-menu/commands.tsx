@@ -5,6 +5,8 @@ import { clearToken } from "../../auth"
 import { updateSessionCwd } from "../../clients/create-session/session.api"
 import type { Command } from "./types/command.types"
 import { HelpDialogContent } from "./help-dialog"
+import { ModelDialogContent } from "./model-dialog"
+import { DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@codak/shared"
 
 export const COMMANDS: Command[] = [
   // ── Conversation ─────────────────────────────────────────────
@@ -24,6 +26,29 @@ export const COMMANDS: Command[] = [
       ctx.dialog.open({
         title: "Open Session",
         children: <SessionsDialogContent navigate={ctx.navigate} />,
+      })
+    },
+  },
+  {
+    name: "Switch Model",
+    description: "Select AI model to use",
+    value: "@models",
+    action: (ctx) => {
+      ctx.dialog.open({
+        title: "Select Model",
+        children: (
+          <ModelDialogContent
+            currentModel={ctx.currentModel ?? DEFAULT_CHAT_MODEL_ID}
+            onSelect={(modelId: SupportedChatModelId) => {
+              ctx.setModel?.(modelId)
+              ctx.dialog.close()
+              ctx.toast.show({
+                message: `Model: ${modelId}`,
+                variant: "success",
+              })
+            }}
+          />
+        ),
       })
     },
   },

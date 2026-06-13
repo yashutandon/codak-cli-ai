@@ -39,7 +39,7 @@ export async function executeTool(
       case "write_file":       result = await writeFileTool(args as any, cwd); break;
       case "edit_file":        result = await editFileTool(args as any, cwd); break;
       case "list_files":       result = await listFilesTool(args as any, cwd); break;
-      case "run_command":      result = await runCommandTool(args as any, cwd); break;
+      case "run_command": result = await runCommandTool(args as any, cwd, sessionId); break;
       case "create_directory": result = await createDirectoryTool(args as any, cwd); break;
       case "delete_file":      result = await deleteFileTool(args as any, cwd); break;
       case "search_files":     result = await searchFilesTool(args as any, cwd); break;

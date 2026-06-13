@@ -8,7 +8,7 @@ import { ErrorMessage } from "../components/messages/error-message";
 import { getSessionById } from "../clients/create-session/session.api";
 import { sendMessage, type ToolCall, type ToolResult } from "../clients/message/message.api";
 import type { Session, Message } from "../clients/create-session/session.types";
-import { DEFAULT_CHAT_MODEL_ID } from "@codak/shared";
+import { DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@codak/shared";
 import type { ToolCallWithResult } from "../components/messages/bot-message";
 
 const sessionLocationSchema = z.object({
@@ -16,8 +16,6 @@ const sessionLocationSchema = z.object({
     (val) => val != null && typeof val === "object" && "id" in val
   ),
 });
-
-const MODEL = DEFAULT_CHAT_MODEL_ID;
 
 type Mode = "BUILD" | "PLAN";
 
@@ -40,16 +38,13 @@ export function Chat() {
     return parsed.success ? parsed.data : null;
   }, [location.state, id]);
 
-  const [session, setSession] = useState<Session | null>(
-    prefetched?.session ?? null
-  );
-  const [messages, setMessages] = useState<MessageWithDuration[]>(
-    prefetched?.session?.messages ?? []
-  );
+  const [session, setSession] = useState<Session | null>(prefetched?.session ?? null);
+  const [messages, setMessages] = useState<MessageWithDuration[]>(prefetched?.session?.messages ?? []);
   const [streamingTurn, setStreamingTurn] = useState<StreamingTurn | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("BUILD");
+  const [model, setModel] = useState<SupportedChatModelId>(DEFAULT_CHAT_MODEL_ID);
 
   const autoTriggeredRef = useRef(false);
 
@@ -68,11 +63,8 @@ export function Chat() {
       setMessages(prefetched.session.messages);
       return;
     }
-
     if (!id) return;
-
     let ignore = false;
-
     const fetchSession = async () => {
       try {
         const data = await getSessionById(id);
@@ -84,7 +76,6 @@ export function Chat() {
         navigate("/", { replace: true });
       }
     };
-
     fetchSession();
     return () => { ignore = true; };
   }, [id, prefetched, navigate]);
@@ -92,10 +83,10 @@ export function Chat() {
   const streamAiResponse = useCallback(async (
     sessionId: string,
     content: string,
-    currentMode: Mode
+    currentMode: Mode,
+    currentModel: SupportedChatModelId
   ) => {
     const startedAt = Date.now();
-
     setStreamingTurn({ content: "", toolCalls: [], startedAt, mode: currentMode });
     setIsStreaming(true);
     setError(null);
@@ -105,7 +96,7 @@ export function Chat() {
     await sendMessage(
       sessionId,
       content,
-      MODEL,
+      currentModel,
       currentMode,
       (chunk) => {
         accText += chunk;
@@ -116,14 +107,10 @@ export function Chat() {
         );
       },
       (toolCall: ToolCall) => {
-        // PLAN mode mein tool calls nahi aate — skip
         if (currentMode === "PLAN") return;
         setStreamingTurn((prev) => {
           const base = prev ?? { content: accText, toolCalls: [], startedAt, mode: currentMode };
-          return {
-            ...base,
-            toolCalls: [...base.toolCalls, { ...toolCall, pending: true }],
-          };
+          return { ...base, toolCalls: [...base.toolCalls, { ...toolCall, pending: true }] };
         });
       },
       (toolResult: ToolResult) => {
@@ -152,7 +139,7 @@ export function Chat() {
             status: "COMPLETE",
             part: null,
             mode: currentMode,
-            model: MODEL,
+            model: currentModel,
             duration: null,
             createdAt: new Date().toISOString(),
             sessionId,
@@ -172,7 +159,6 @@ export function Chat() {
 
   const handleSubmit = useCallback(async (text: string) => {
     if (!session || isStreaming) return;
-
     const userMsg: MessageWithDuration = {
       id: crypto.randomUUID(),
       role: "USER",
@@ -181,28 +167,24 @@ export function Chat() {
       status: "COMPLETE",
       part: null,
       mode,
-      model: MODEL,
+      model,
       duration: null,
       createdAt: new Date().toISOString(),
       sessionId: session.id,
     };
-
     setMessages((prev) => [...prev, userMsg]);
-    await streamAiResponse(session.id, text, mode);
-  }, [session, isStreaming, streamAiResponse, mode]);
+    await streamAiResponse(session.id, text, mode, model);
+  }, [session, isStreaming, streamAiResponse, mode, model]);
 
   useEffect(() => {
     if (!session || autoTriggeredRef.current || isStreaming) return;
-
     const hasAssistant = messages.some((m) => m.role === "ASSISTANT");
     if (hasAssistant) return;
-
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "USER") return;
-
     autoTriggeredRef.current = true;
-    streamAiResponse(session.id, lastMsg.content, mode);
-  }, [session, messages, isStreaming, streamAiResponse, mode]);
+    streamAiResponse(session.id, lastMsg.content, mode, model);
+  }, [session, messages, isStreaming, streamAiResponse, mode, model]);
 
   if (!session) {
     return <ChatShell onSubmit={() => { }} inputDisabled loading />;
@@ -215,6 +197,8 @@ export function Chat() {
       loading={isStreaming}
       mode={mode}
       onModeChange={setMode}
+      model={model}
+      onModelChange={setModel}
       sessionId={session.id}
       sessionCwd={session.cwd}
     >
@@ -231,17 +215,15 @@ export function Chat() {
           />
         )
       )}
-
       {streamingTurn !== null && (
         <BotMessage
           content={streamingTurn.content}
-          model={MODEL}
+          model={model}
           mode={streamingTurn.mode}
           toolCalls={streamingTurn.toolCalls}
           streaming={true}
         />
       )}
-
       {error && <ErrorMessage message={error} />}
     </ChatShell>
   );

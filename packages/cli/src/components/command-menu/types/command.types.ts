@@ -1,6 +1,7 @@
 import type { NavigateFunction } from "react-router"
 import type { DialogContextValue } from "../../../providers/dialog"
 import type { ToastContextValue } from "../../../providers/toast"
+import type { SupportedChatModelId } from "@codak/shared"
 
 type Mode = "BUILD" | "PLAN"
 
@@ -13,6 +14,8 @@ export type CommandContext = {
   sessionId?: string
   sessionCwd?: string | null
   setMode?: (mode: Mode) => void
+   currentModel?: SupportedChatModelId
+  setModel?: (modelId: SupportedChatModelId) => void
 }
 
 export type Command = {

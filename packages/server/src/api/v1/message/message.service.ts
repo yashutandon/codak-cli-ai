@@ -9,7 +9,7 @@ import { getIndexingStatus, retrieveRelevantChunks } from "../../infra/embedding
 import { getSystemPrompt } from "../../lib/constants/system-prompt";
 import { detectPackageManager } from "../../lib/tools/build/detect-package-manager";
 import { getModel } from "../../model/get-model";
-import { runPlanner } from "../../service/planner.service";
+import { runMultiAgent, runPlanner } from "../../service/planner.service";
 import { updateProjectMemory, buildMemoryContext } from "../../service/project-memory";
 
 const SESSION_CACHE_TTL = 60 * 5;
@@ -32,7 +32,10 @@ async function invalidateSessionCache(sessionId: string, userId: string) {
   await redis.del(`session:${sessionId}:${userId}`);
 }
 
+
+
 function buildTools(cwd: string, sessionId: string) {
+  
   const makeExecute = (name: ToolName) => async (args: Record<string, unknown>) =>
     executeTool(name, args, cwd, sessionId);
 
@@ -153,6 +156,50 @@ export async function sendMessage(
   }
 
   // BUILD mode
+
+
+  const isComplex = /build|implement|create|add|setup|integrate|refactor|migrate|scaffold/i.test(data.content)
+  && data.content.trim().split(/\s+/).length >= 5;
+
+if (isComplex) {
+  const multiAgentResult = await runMultiAgent(
+    data.content,
+    cwd,
+    fullRagContext,
+    data.model,
+    history
+  );
+
+  await db.message.create({
+    data: {
+      sessionId,
+      role: "ASSISTANT",
+      content: multiAgentResult,
+      mode: data.mode,
+      model: data.model,
+      status: "COMPLETE",
+      title: "",
+    },
+  });
+
+  await invalidateSessionCache(sessionId, userId);
+
+  const encoder = new TextEncoder();
+  const multiStream = new ReadableStream({
+    start(controller) {
+      const lines = multiAgentResult.split("\n");
+      for (const line of lines) {
+        const chunk = JSON.stringify({ type: "text-delta", text: line + "\n" });
+        controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+      }
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
+      controller.close();
+    },
+  });
+
+  return { isPlanner: true, planStream: multiStream };
+}
+
   const result = streamText({
     model: getModel(data.model),
     system: getSystemPrompt(cwd, fullRagContext, pm.name),

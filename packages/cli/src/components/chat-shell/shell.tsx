@@ -2,7 +2,7 @@ import { TextAttributes } from "@opentui/core"
 import type { ReactNode } from "react"
 import { InputBar } from "../cli-input/input-bar"
 import { Spinner } from "../common/spinner"
-import { DEFAULT_CHAT_MODEL_ID } from "@codak/shared"
+import { DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@codak/shared"
 import { useTheme } from "../../providers/theme"
 
 type Mode = "BUILD" | "PLAN"
@@ -12,7 +12,8 @@ type Props = {
   onSubmit: (text: string) => void
   inputDisabled?: boolean
   loading?: boolean
-  model?: string
+  model?: SupportedChatModelId
+  onModelChange?: (modelId: SupportedChatModelId) => void
   mode?: Mode
   onModeChange?: (mode: Mode) => void
   sessionId?: string
@@ -25,6 +26,7 @@ export function ChatShell({
   inputDisabled = false,
   loading = false,
   model = DEFAULT_CHAT_MODEL_ID,
+  onModelChange,
   mode = "BUILD",
   onModeChange,
   sessionId,
@@ -53,6 +55,8 @@ export function ChatShell({
           statusBar={{ model }}
           onModeChange={() => onModeChange?.(mode === "BUILD" ? "PLAN" : "BUILD")}
           setMode={onModeChange}
+          setModel={onModelChange}
+          currentModel={model}
           sessionId={sessionId}
           sessionCwd={sessionCwd}
         />
