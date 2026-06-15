@@ -1,113 +1,122 @@
 # Codak
 
-**An autonomous AI coding agent that lives in your terminal.**
+**Your codebase-aware autonomous software engineer.**
 
-Codak reads your codebase, writes and edits files, runs commands, manages git, and fixes its own build errors — all from a chat interface in your CLI. Think of it as a self-hosted, open alternative to Claude Code, with multi-provider model support and a Planner/Builder workflow.
+Codak is not a chat interface. It is an engineer — one that understands your project, remembers how you work, writes production-ready code, and fixes its own mistakes. It lives in your terminal, works on any project, and gets smarter the longer you use it.
 
 ---
 
-## ✨ Features
+## 🧠 Project Memory
 
-- **Agentic file operations** — read, write, edit (surgical diffs), delete, search files and directories
-- **Shell execution** — runs commands with a safety firewall and optional Docker sandboxing
-- **Git native** — status, diff, commit, branch, log, checkout — all via tool calls
-- **RAG over your codebase** — automatic indexing with pgvector + Google embeddings, incremental re-indexing on every file change
-- **Build → Test → Fix loop** — after every code change, the agent verifies the build and self-corrects (up to 3 iterations)
-- **PLAN vs BUILD modes** — toggle with `Tab` or `@plan` / `@build`. PLAN mode produces a structured plan with no file changes; BUILD mode executes
-- **Multi-agent orchestration** — complex requests are broken down by an Orchestrator into Coding + Review sub-agent tasks
-- **Multi-provider models** — switch between Anthropic, OpenAI, Google, and Groq with `@models`
-- **Project memory** — package manager, framework, and conventions are remembered across sessions via Redis
-- **Auth** — JWT-based auth with browser-callback OAuth flow (GitHub / Google)
-- **Tool execution logs** — every tool call is logged with args, result, duration, and errors for full observability
+Codak remembers your project across every session.
+
+Most AI tools forget everything the moment you close the tab. Codak doesn't. It builds and maintains a persistent memory of your project — package manager, framework, conventions, decisions — stored in Redis and injected into every conversation automatically.
+
+You never have to say "this is a Bun project" or "we use Zod for validation" twice.
+
+```
+Session 1: "This project uses Bun and Prisma"
+Session 2: Codak already knows. No re-explaining needed.
+```
+
+---
+
+## 🔍 Code Intelligence (RAG)
+
+Codak reads your codebase before it responds.
+
+When you ask Codak to do something, it doesn't guess. It first retrieves the most relevant parts of your codebase using vector similarity search — then grounds its response in what's actually there.
+
+- Files are chunked (150-line segments, 20-line overlap) and embedded using Google's `gemini-embedding-001` (3072-dim vectors)
+- Every message triggers a cosine similarity search via `pgvector` — top-5 most relevant chunks are injected into context
+- Every file Codak edits is automatically re-indexed — context is always fresh, never stale
+
+The result: Codak writes code that matches your patterns, imports from your actual modules, and uses your existing utilities — not generic boilerplate.
+
+---
+
+## 🔁 Self-Healing Workflows
+
+Codak doesn't stop at "here's the code." It verifies it works.
+
+After every change, Codak runs your build and tests. If something breaks, it reads the error, finds the root cause, fixes the specific file, and retries — up to 3 times, automatically.
+
+```
+Write code
+   ↓
+Run build
+   ↓
+Error? → Read stderr → Fix root cause → Retry
+   ↓
+Success → Report done
+```
+
+It detects your package manager automatically (`bun`, `pnpm`, `yarn`, `npm`) from lockfiles and uses the right commands throughout.
+
+---
+
+## 🤝 Multi-Agent Execution
+
+Simple tasks go straight to execution. Complex tasks get broken down.
+
+Codak's Orchestrator analyzes incoming requests and decides how to handle them:
+
+- **Simple** — a single tool-calling agent handles it end to end, streamed live
+- **Complex** — broken into sub-tasks, each handled by a specialized Coding agent, then reviewed by a Review agent that checks for bugs, type errors, and security issues before the result is returned
+
+There's also a dedicated **PLAN mode** — Codak analyzes your request and returns a structured plan (Goal, Steps, Dependencies, Risks) with zero file changes. Review it, then switch to BUILD mode to execute.
+
+```
+@plan  →  structured analysis, no changes
+@build →  full execution with tools
+```
+
+---
+
+## 🛡️ Safe by Default
+
+Every action Codak takes passes through a safety layer before execution.
+
+- **Firewall** — `rm -rf`, `sudo`, disk formatting, path traversal, and shutdown commands are blocked unconditionally
+- **Scoped access** — all file operations resolve relative to your project directory. Codak cannot touch anything outside it
+- **Docker sandbox** — shell commands optionally run inside an isolated container (`--network=none`, `--memory=512m`) that is destroyed after each message
+- **Audit log** — every tool call (arguments, result, duration, errors) is persisted to Postgres for full observability
+
+---
+
+## ⚡ Everything else
+
+- **Surgical edits** — `edit_file` replaces an exact string, not the whole file
+- **Full git workflow** — status, diff, commit, branch, log, checkout — all via native tool calls
+- **Multi-provider models** — Anthropic, OpenAI, Google Gemini, Groq — switch with `@models`
+- **React terminal UI** — built with `@opentui/react`, full keyboard navigation, live streaming
+- **Browser-callback OAuth** — GitHub + Google auth without storing credentials in the CLI
 
 ---
 
 ## 🏗️ Architecture
-
-Codak is a Bun monorepo:
 
 ```
 codak-cli-ai/
 ├── packages/
 │   ├── cli/        # Terminal UI — @opentui/react
 │   ├── server/     # Express API — agent orchestration, tools, RAG
-│   ├── web/        # Next.js — auth/login page (browser callback)
-│   ├── database/   # Prisma schema + client (Neon Postgres + pgvector)
-│   └── shared/     # Shared types, tool definitions, model registry
+│   ├── web/        # Next.js — auth page (browser callback)
+│   ├── database/   # Prisma + Neon Postgres + pgvector
+│   └── shared/     # Types, tool definitions, model registry
 ```
 
-### Tech stack
-
-| Layer        | Technology                                              |
-|--------------|----------------------------------------------------------|
-| Runtime      | Bun                                                       |
-| CLI UI       | React + `@opentui/react` (terminal renderer)              |
-| API          | Express, Server-Sent Events for streaming                |
-| AI           | Vercel AI SDK — Anthropic, OpenAI, Google, Groq           |
-| Database     | PostgreSQL (Neon) + pgvector, Prisma ORM                  |
-| RAG / Embeddings | Google `gemini-embedding-001` (3072-dim), pgvector cosine similarity search, chunked file indexing with rate-limit-aware retry |
-| Cache/Memory | Redis (Upstash-compatible) — session cache + project memory |
-| Sandbox      | Docker (optional, for isolated command execution)        |
-| Auth         | JWT + bcrypt, browser-based OAuth callback flow (GitHub/Google) |
-
-### How a message flows
-
-```
-User input (CLI)
-   │
-   ▼
-POST /sessions/:id/messages
-   │
-   ├─ Load session + recent history + project memory (Redis)
-   ├─ Retrieve relevant code chunks (pgvector similarity search)
-   ├─ Detect package manager (bun / pnpm / yarn / npm)
-   │
-   ├─ PLAN mode  → Planner agent returns a structured plan (no tools)
-   │
-   └─ BUILD mode → Orchestrator checks task complexity
-         ├─ Simple  → direct tool-calling agent (streamed)
-         └─ Complex → Coding agent(s) + Review agent per sub-task
-   │
-   ▼
-SSE stream → CLI renders text, tool calls, and results live
-   │
-   ▼
-On finish: response saved, RAG re-indexed for changed files,
-project memory updated, cache invalidated
-```
-
----
-
-## 🧰 Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `read_file` | Read a file's contents |
-| `write_file` | Create or overwrite a file |
-| `edit_file` | Replace an exact string within a file (surgical edits) |
-| `list_files` | List a directory's contents |
-| `search_files` | Glob-pattern file search |
-| `create_directory` | Create directories recursively |
-| `delete_file` | Delete a file or empty directory |
-| `run_command` | Execute a shell command (firewalled, optionally sandboxed in Docker) |
-| `git_status` / `git_diff` / `git_commit` / `git_checkout` / `git_create_branch` / `git_log` | Full git workflow |
-
-All destructive operations (`run_command`, `delete_file`, `write_file`, `edit_file`) pass through a **validation firewall** that blocks high-risk commands (`rm -rf /`, `sudo`, `shutdown`, `mkfs`, path traversal, etc.) before execution.
-
----
-
-## 🔍 RAG — Codebase Indexing & Retrieval
-
-When a session's working directory is set, Codak indexes the project in the background so the agent can ground its responses in real code:
-
-- **Scanning** — walks the project tree, skipping `node_modules`, `.git`, build artifacts, lockfiles, and oversized files (>500KB)
-- **Chunking** — splits each file into ~150-line chunks with 20-line overlap to preserve context across boundaries
-- **Embedding** — generates 3072-dim vectors via Google's `gemini-embedding-001`, batched and rate-limited (auto-retries on 429 with a 65s backoff)
-- **Storage** — chunks + embeddings are stored in Postgres via `pgvector`
-- **Retrieval** — on every message, the top-K most similar chunks (cosine distance) are pulled and injected into the agent's system prompt as codebase context
-- **Incremental re-indexing** — after every `write_file` / `edit_file`, only the changed file is re-chunked and re-embedded — no full repo rescan
-
-This means the agent always has up-to-date context about the files it just modified, without re-indexing the entire project on every turn.
+| Layer | Technology |
+|-------|------------|
+| Runtime | Bun |
+| CLI UI | React + `@opentui/react` |
+| API | Express, Server-Sent Events |
+| AI | Vercel AI SDK — Anthropic, OpenAI, Google, Groq |
+| Database | PostgreSQL (Neon) + pgvector, Prisma ORM |
+| RAG | `gemini-embedding-001` (3072-dim), pgvector cosine search |
+| Memory / Cache | Redis — project memory (7-day TTL) + session cache (5-min TTL) |
+| Sandbox | Docker — network-disabled, resource-limited, per-message |
+| Auth | JWT + bcrypt, browser-callback OAuth (GitHub / Google) |
 
 ---
 
@@ -116,12 +125,12 @@ This means the agent always has up-to-date context about the files it just modif
 ### Prerequisites
 
 - [Bun](https://bun.sh) 1.3+
-- PostgreSQL database with the [pgvector](https://github.com/pgvector/pgvector) extension (e.g. [Neon](https://neon.tech))
-- Redis instance (e.g. [Upstash](https://upstash.com))
-- API keys for the model providers you want to use
-- (Optional) Docker, for sandboxed command execution
+- PostgreSQL with [pgvector](https://github.com/pgvector/pgvector) — [Neon](https://neon.tech) free tier works
+- Redis — [Upstash](https://upstash.com) free tier works
+- At least one LLM provider API key
+- (Optional) Docker for sandboxed command execution
 
-### Installation
+### Install
 
 ```bash
 git clone https://github.com/yashutandon/codak-cli-ai.git
@@ -132,15 +141,12 @@ bun install
 ### Environment variables
 
 **`packages/server/.env`**
-
 ```env
 DATABASE_URL=postgresql://<user>:<password>@<host>/<db>?sslmode=require
 JWT_SECRET=<a-long-random-secret>
 JWT_EXPIRES_IN=7d
-
 REDIS_URL=rediss://<user>:<password>@<host>:6380
 
-# At least one provider key is required
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_GENERATIVE_AI_API_KEY=AIza...
@@ -150,27 +156,21 @@ PORT=3001
 ```
 
 **`packages/cli/.env`**
-
 ```env
 CODAK_WEB_URL=http://localhost:3000
 CODAK_API_URL=http://localhost:3001
 ```
 
 **`packages/web/.env.local`**
-
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
 
-### Database setup
-
-Enable pgvector on your Postgres instance:
+### Database
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
-
-Then push the schema:
 
 ```bash
 cd packages/database
@@ -180,50 +180,40 @@ bunx prisma db push
 
 ### Run
 
-In three separate terminals:
-
 ```bash
 bun run dev:server   # API on :3001
-bun run dev:web      # Login page on :3000
+bun run dev:web      # Auth page on :3000
 bun run dev:cli      # Terminal UI
 ```
 
-On first run, the CLI opens your browser for authentication. Once signed in, you're dropped into the chat interface.
+On first run, the CLI opens your browser for authentication. Once signed in, you're in.
 
 ---
 
-## ⌨️ CLI Commands
+## ⌨️ Commands
 
 | Command | Description |
 |---------|-------------|
-| `@new` | Start a new conversation |
+| `@new` | Start a new session |
 | `@open` | Browse and resume an existing session |
-| `@close` | Return to the home screen |
+| `@close` | Return to home |
 | `@build` / `@plan` | Switch agent mode (or press `Tab`) |
-| `@models` | Switch the active AI model |
-| `@setpath` | Set the project directory for the current session |
-| `@theme` | Change the color theme |
+| `@models` | Switch the active model |
+| `@setpath` | Set the project directory for this session |
+| `@theme` | Change color theme |
 | `@logout` | Sign out |
 | `@help` | List all commands |
 | `@exit` | Quit |
 
 ---
 
-## 🔒 Safety
-
-- **Firewall** — every `run_command`, `write_file`, `edit_file`, and `delete_file` call is validated before execution. Recursive deletes, disk formatting, shutdown/reboot, and path traversal outside the project root are blocked unconditionally.
-- **Scoped filesystem access** — all file operations resolve relative to the session's working directory; the agent cannot read or write outside it.
-- **Docker sandbox (optional)** — when Docker is available, `run_command` executes inside an isolated, network-disabled, resource-limited container (`--memory=512m --cpus=1 --network=none`) and is destroyed after use.
-- **Tool execution audit log** — every tool call (arguments, result, duration, errors) is persisted for review.
-
----
-
 ## 🗺️ Roadmap
 
+- [ ] `codak.md` — project-level rules the agent loads automatically
+- [ ] Ollama support — local models, no API key required
+- [ ] VS Code extension
 - [ ] `npm install -g codak-cli` distribution
-- [ ] Model-per-agent configuration (different models for Planner/Coder/Reviewer)
-- [ ] Incremental scoped re-indexing improvements
-- [ ] Web dashboard for session history and tool execution logs
+- [ ] Model-per-agent configuration
 
 ---
 
