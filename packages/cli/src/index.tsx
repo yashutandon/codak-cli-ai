@@ -8,6 +8,9 @@ import { NewChat } from "./screens/new-chat";
 import { Chat } from "./screens/chats";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ensureAuthenticated } from "./auth";
+import { config } from "dotenv";
+import { resolve } from "path";
+config({ path: resolve(import.meta.dirname, "../.env") });
 
 // Auth check before rendering
 await ensureAuthenticated();
