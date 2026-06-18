@@ -11,6 +11,7 @@ import { detectPackageManager } from "../../lib/tools/build/detect-package-manag
 import { getModel } from "../../model/get-model";
 import { runMultiAgent, runPlanner } from "../../service/planner.service";
 import { updateProjectMemory, buildMemoryContext } from "../../service/project-memory";
+import { loadCodakRules, invalidateCodakRulesCache } from "../../service/codak-rules.service";
 
 const SESSION_CACHE_TTL = 60 * 5;
 
@@ -32,10 +33,7 @@ async function invalidateSessionCache(sessionId: string, userId: string) {
   await redis.del(`session:${sessionId}:${userId}`);
 }
 
-
-
 function buildTools(cwd: string, sessionId: string) {
-  
   const makeExecute = (name: ToolName) => async (args: Record<string, unknown>) =>
     executeTool(name, args, cwd, sessionId);
 
@@ -60,6 +58,23 @@ function buildTools(cwd: string, sessionId: string) {
   };
 }
 
+function toSSEStream(text: string): ReadableStream {
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      for (const line of text.split("\n")) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: "text-delta", text: line + "\n" })}\n\n`)
+        );
+      }
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`)
+      );
+      controller.close();
+    },
+  });
+}
+
 export async function sendMessage(
   sessionId: string,
   userId: string,
@@ -77,10 +92,16 @@ export async function sendMessage(
   if (!session) throw new AppError("Session not found", 404);
 
   const cwd = session.cwd ?? process.cwd();
-  const pm = await detectPackageManager(cwd);
 
-  await updateProjectMemory(sessionId, { packageManager: pm.name });
-  const memoryContext = await buildMemoryContext(sessionId);
+  // Gather all context in parallel
+  const [pm, codakRules, memoryContext] = await Promise.all([
+    detectPackageManager(cwd),
+    loadCodakRules(cwd),
+    buildMemoryContext(sessionId),
+  ]);
+
+  // Fire-and-forget memory update
+  updateProjectMemory(sessionId, { packageManager: pm.name }).catch(console.error);
 
   await db.message.create({
     data: {
@@ -101,9 +122,9 @@ export async function sendMessage(
       content: m.content,
     }));
 
+  // RAG retrieval
   let ragContext = "";
-  const indexingStatus = getIndexingStatus(sessionId);
-  if (indexingStatus === "done") {
+  if (getIndexingStatus(sessionId) === "done") {
     try {
       ragContext = await retrieveRelevantChunks(sessionId, data.content);
     } catch (err) {
@@ -111,17 +132,18 @@ export async function sendMessage(
     }
   }
 
-  const fullRagContext = [ragContext, memoryContext].filter(Boolean).join("\n\n");
+  // Build full context: RAG + project memory + codak.md rules
+  const contextParts: string[] = [];
+  if (ragContext) contextParts.push(ragContext);
+  if (memoryContext) contextParts.push(memoryContext);
+  if (codakRules) {
+    contextParts.push(`<project_rules>\n${codakRules}\n</project_rules>`);
+  }
+  const fullContext = contextParts.join("\n\n");
 
-  // PLAN mode
+  // ─── PLAN mode ─────────────────────────────────────────────────
   if (data.mode === "PLAN") {
-    const plan = await runPlanner(
-      data.content,
-      cwd,
-      fullRagContext,
-      data.model,
-      history
-    );
+    const plan = await runPlanner(data.content, cwd, fullContext, data.model, history);
 
     await db.message.create({
       data: {
@@ -136,85 +158,44 @@ export async function sendMessage(
     });
 
     await invalidateSessionCache(sessionId, userId);
+    return { isPlanner: true, planStream: toSSEStream(plan) };
+  }
 
-    const encoder = new TextEncoder();
-    const planStream = new ReadableStream({
-      start(controller) {
-        const lines = plan.split("\n");
-        for (const line of lines) {
-          const chunk = JSON.stringify({ type: "text-delta", text: line + "\n" });
-          controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
-        }
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`)
-        );
-        controller.close();
+  // ─── BUILD mode — complex task (multi-agent) ───────────────────
+  const isComplex =
+    /build|implement|create|add|setup|integrate|refactor|migrate|scaffold/i.test(data.content) &&
+    data.content.trim().split(/\s+/).length >= 5;
+
+  if (isComplex) {
+    const result = await runMultiAgent(data.content, cwd, fullContext, data.model, history);
+
+    await db.message.create({
+      data: {
+        sessionId,
+        role: "ASSISTANT",
+        content: result,
+        mode: data.mode,
+        model: data.model,
+        status: "COMPLETE",
+        title: "",
       },
     });
 
-    return { isPlanner: true, planStream };
+    await invalidateSessionCache(sessionId, userId);
+    return { isPlanner: true, planStream: toSSEStream(result) };
   }
 
-  // BUILD mode
-
-
-  const isComplex = /build|implement|create|add|setup|integrate|refactor|migrate|scaffold/i.test(data.content)
-  && data.content.trim().split(/\s+/).length >= 5;
-
-if (isComplex) {
-  const multiAgentResult = await runMultiAgent(
-    data.content,
-    cwd,
-    fullRagContext,
-    data.model,
-    history
-  );
-
-  await db.message.create({
-    data: {
-      sessionId,
-      role: "ASSISTANT",
-      content: multiAgentResult,
-      mode: data.mode,
-      model: data.model,
-      status: "COMPLETE",
-      title: "",
-    },
-  });
-
-  await invalidateSessionCache(sessionId, userId);
-
-  const encoder = new TextEncoder();
-  const multiStream = new ReadableStream({
-    start(controller) {
-      const lines = multiAgentResult.split("\n");
-      for (const line of lines) {
-        const chunk = JSON.stringify({ type: "text-delta", text: line + "\n" });
-        controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
-      }
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
-      controller.close();
-    },
-  });
-
-  return { isPlanner: true, planStream: multiStream };
-}
-
+  // ─── BUILD mode — simple task (direct streaming) ───────────────
   const result = streamText({
     model: getModel(data.model),
-    system: getSystemPrompt(cwd, fullRagContext, pm.name),
+    system: getSystemPrompt(cwd, fullContext, pm.name),
     messages: [...history, { role: "user" as const, content: data.content }],
     tools: buildTools(cwd, sessionId),
     // @ts-ignore
     stopWhen: stepCountIs(10),
     onFinish: async ({ text, steps }) => {
-      const fullText = steps
-        .map((s: any) => s.text ?? "")
-        .filter(Boolean)
-        .join("\n")
-        .trim();
-
-      const finalContent = fullText || text || "";
+      const finalContent =
+        steps.map((s: any) => s.text ?? "").filter(Boolean).join("\n").trim() || text || "";
 
       await db.message.create({
         data: {
@@ -227,6 +208,18 @@ if (isComplex) {
           title: "",
         },
       });
+
+      // Invalidate codak.md cache if agent edited it
+      const editedFiles = steps.flatMap((s: any) =>
+        (s.toolCalls ?? [])
+          .filter((tc: any) => tc.toolName === "write_file" || tc.toolName === "edit_file")
+          .map((tc: any) => String(tc.args?.path ?? tc.input?.path ?? ""))
+      );
+
+      if (editedFiles.some((f) => f.endsWith("codak.md"))) {
+        await invalidateCodakRulesCache(cwd);
+        console.log("[codak.md] Cache invalidated after agent edit");
+      }
 
       await invalidateSessionCache(sessionId, userId);
     },
