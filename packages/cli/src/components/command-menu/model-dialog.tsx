@@ -11,6 +11,13 @@ const PROVIDER_LABELS: Record<string, string> = {
   groq:      "Groq (Free)",
 }
 
+const PROVIDER_ICONS: Record<string, string> = {
+  anthropic: "◆",
+  openai:    "◇",
+  google:    "◈",
+  groq:      "○",
+}
+
 type ModelEntry = typeof SUPPORTED_CHAT_MODELS[number]
 
 type Props = {
@@ -45,9 +52,12 @@ export function ModelDialogContent({ currentModel, onSelect }: Props) {
         return (
           <>
             <text fg={isSelected ? colors.primary : colors.dimSeparator}>
-              {isCurrent ? "◉" : isSelected ? "›" : " "}
+              {isCurrent ? "●" : isSelected ? "›" : " "}
             </text>
-            <box flexGrow={1} flexShrink={1} overflow="hidden" paddingLeft={1}>
+            <box flexGrow={1} flexShrink={1} overflow="hidden" paddingLeft={1} flexDirection="row" gap={1}>
+              <text fg={colors.dimSeparator}>
+                {PROVIDER_ICONS[model.provider] ?? "○"}
+              </text>
               <text
                 fg={isSelected ? colors.thinking : isCurrent ? colors.primary : colors.info}
                 attributes={isSelected || isCurrent ? TextAttributes.BOLD : TextAttributes.NONE}

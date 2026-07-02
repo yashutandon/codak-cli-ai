@@ -1,3 +1,4 @@
+import { TextAttributes } from "@opentui/core"
 import { useTheme } from "../../providers/theme"
 
 export function Header() {
@@ -12,7 +13,7 @@ export function Header() {
         paddingTop: 1,
         paddingBottom: 1,
         gap: 0,
-        borderStyle: "double",
+        borderStyle: "rounded",
         borderColor: colors.primary,
         titleAlignment: "center",
         bottomTitleAlignment: "center",

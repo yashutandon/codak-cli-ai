@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { TextAttributes } from "@opentui/core";
 import { useDialog } from "../../providers/dialog";
 import { useTheme } from "../../providers/theme";
 import { DialogSearchList } from "../common/dialog-search-list";
@@ -36,13 +37,18 @@ export const ThemeDialogContent = () => {
             onHighlight={handleHighLight}
             filterFn={(t, query) => t.name.toLowerCase().includes(query.toLowerCase())}
             renderItem={(theme, isSelected) => (
-                <text
-                    selectable={false}
-                    fg={isSelected ? colors.background : colors.thinking}
-                >
-                    {theme.name === originalThemeRef.current.name ? "\u0020\u2022\u0020" : "\u0020\u0020\u0020"}
-                    {theme.name}
-                </text>
+                <box flexDirection="row" gap={1} alignItems="center">
+                    <text fg={isSelected ? colors.background : colors.primary}>
+                        {theme.name === originalThemeRef.current.name ? "●" : "○"}
+                    </text>
+                    <text
+                        selectable={false}
+                        fg={isSelected ? colors.background : colors.thinking}
+                        attributes={isSelected ? TextAttributes.BOLD : TextAttributes.NONE}
+                    >
+                        {theme.name}
+                    </text>
+                </box>
             )}
             getKey={(t) => t.name}
             placeholder="search themes"

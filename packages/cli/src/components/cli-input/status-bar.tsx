@@ -24,6 +24,7 @@ export function StatusBar({
       flexGrow={0}
       paddingLeft={1}
       paddingRight={1}
+      gap={1}
     >
       <AppSlot
         name="statusbar_left"
@@ -49,14 +50,26 @@ function DefaultStatusLeft({
   interactionMode,
 }: Required<StatusBarProps>) {
   const { colors } = useTheme()
+  const isPlan = interactionMode.toUpperCase() === "PLAN"
+
   return (
-    <box flexDirection="row" gap={1} alignItems="center">
-      <text fg={colors.primary} attributes={TextAttributes.BOLD}>
+    <box
+      flexDirection="row"
+      gap={1}
+      alignItems="center"
+      paddingX={1}
+      backgroundColor={colors.surface}
+    >
+      <text fg={isPlan ? colors.planMode : colors.primary}>
+        {isPlan ? "◈" : "◉"}
+      </text>
+      <text
+        fg={isPlan ? colors.planMode : colors.primary}
+        attributes={TextAttributes.BOLD}
+      >
         {interactionMode}
       </text>
-      <text fg={colors.dimSeparator}>
-        &gt;
-      </text>
+      <text fg={colors.dimSeparator}>›</text>
       <text fg={colors.info}>{model}</text>
     </box>
   )

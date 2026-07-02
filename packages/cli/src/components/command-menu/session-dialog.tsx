@@ -53,7 +53,8 @@ export function SessionsDialogContent({ navigate }: Props) {
 
     if (loading) {
         return (
-            <box paddingY={1}>
+            <box paddingY={1} flexDirection="row" gap={1} alignItems="center">
+                <text fg={colors.dimSeparator}>◌</text>
                 <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
                     Loading sessions...
                 </text>
@@ -97,7 +98,7 @@ export function SessionsDialogContent({ navigate }: Props) {
                         </text>
                     </box>
                     <text fg={colors.dimSeparator} attributes={TextAttributes.DIM}>
-                        {formatDate(session.createdAt)}
+                        ⏱ {formatDate(session.createdAt)}
                     </text>
                 </>
             )}

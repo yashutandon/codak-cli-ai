@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { useKeyboard } from "@opentui/react"
-import type { InputRenderable, KeyBinding } from "@opentui/core"
+import { TextAttributes, type InputRenderable, type KeyBinding } from "@opentui/core"
 import { useNavigate } from "react-router"
 
 import { StatusBar, type StatusBarProps } from "./status-bar"
@@ -220,8 +220,8 @@ const handleCommand = useCallback((command: Command | undefined) => {
             border={["left"]}
             customBorderChars={{
                 ...EmptyBorder,
-                vertical: "┃",
-                bottomLeft: "┗",
+                vertical: "│",
+                bottomLeft: "╰",
             }}
             flexDirection="row"
             alignItems="center"
@@ -246,7 +246,7 @@ const handleCommand = useCallback((command: Command | undefined) => {
                     width="100%"
                 >
                     <text fg={promptColor}>
-                        {disabled ? "✖ " : "› "}
+                        {disabled ? "✖ " : "❯ "}
                     </text>
 
                     {showCommandMenu && (
@@ -277,7 +277,7 @@ const handleCommand = useCallback((command: Command | undefined) => {
                         placeholder={
                             disabled
                                 ? "Disabled..."
-                                : "Type a message..."
+                                : "Type a message, @ for commands..."
                         }
                         backgroundColor="transparent"
                         focusedBackgroundColor="transparent"
@@ -292,12 +292,12 @@ const handleCommand = useCallback((command: Command | undefined) => {
                         onSubmit={handleInputSubmit}
                     />
 
-                    <text fg={hintColor}>
+                    <text fg={hintColor} attributes={TextAttributes.DIM}>
                         {disabled
                             ? ""
                             : value.trim().length > 0
-                                ? "↵"
-                                : "esc to cancel"}
+                                ? "⏎ send"
+                                : "esc cancel"}
                     </text>
                 </box>
             </box>

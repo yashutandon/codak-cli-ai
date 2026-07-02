@@ -39,15 +39,18 @@ export function Home() {
   );
 
   return (
-    <box gap={2} position="relative" width="100%" height="100%">
+    <box gap={2} position="relative" width="100%" height="100%" paddingX={1}>
       <Header />
 
       {sessions.length > 0 && (
         <box flexDirection="column" width="100%" paddingX={2}>
-          <text fg={colors.primary} attributes={TextAttributes.DIM}>
-            Recent Sessions
-          </text>
-          <box flexDirection="column" width="100%" marginTop={1}>
+          <box flexDirection="row" gap={1} alignItems="center">
+            <text fg={colors.primary}>◈</text>
+            <text fg={colors.primary} attributes={TextAttributes.BOLD}>
+              Recent Sessions
+            </text>
+          </box>
+          <box flexDirection="column" width="100%" marginTop={1} gap={0}>
             {sessions.slice(0, 8).map((session, index) => (
               <box
                 key={session.id}
@@ -61,7 +64,9 @@ export function Home() {
                 <text fg={colors.primary} flexGrow={1}>
                   {session.title.length > 50 ? session.title.slice(0, 50) + "..." : session.title}
                 </text>
-                <text attributes={TextAttributes.DIM}>{formatDate(session.createdAt)}</text>
+                <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
+                  {formatDate(session.createdAt)}
+                </text>
               </box>
             ))}
           </box>

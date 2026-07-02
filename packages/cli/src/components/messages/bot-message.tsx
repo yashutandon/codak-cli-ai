@@ -54,10 +54,16 @@ function ToolCallItem({ toolCall }: { toolCall: ToolCallWithResult }) {
   })();
 
   return (
-    <box flexDirection="column" width="100%" paddingX={3}>
+    <box
+      flexDirection="column"
+      width="100%"
+      paddingX={2}
+      paddingLeft={3}
+      borderColor={colors.selection}
+    >
       <box flexDirection="row" gap={1} alignItems="center">
         <text fg={toolCall.pending ? colors.planMode : colors.success}>
-          {toolCall.pending ? "◌" : "✓"}
+          {toolCall.pending ? "◌" : "●"}
         </text>
         <text fg={colors.info} attributes={TextAttributes.BOLD}>
           {label}
@@ -72,7 +78,7 @@ function ToolCallItem({ toolCall }: { toolCall: ToolCallWithResult }) {
       {!toolCall.pending && resultText ? (
         <box paddingLeft={3}>
           <text fg={colors.dimSeparator} attributes={TextAttributes.DIM}>
-            {resultText}
+            ↳ {resultText}
           </text>
         </box>
       ) : null}
@@ -144,9 +150,11 @@ function MarkdownContent({
 
     if (inCodeBlock) {
       elements.push(
-        <text key={key} fg={colors.success}>
-          {"  " + (line.type === "text" ? line.text : "")}
-        </text>
+        <box key={key} paddingLeft={1} backgroundColor={colors.surface}>
+          <text fg={colors.success}>
+            {"  " + (line.type === "text" ? line.text : "")}
+          </text>
+        </box>
       );
       return;
     }
@@ -165,9 +173,12 @@ function MarkdownContent({
 
     if (line.type === "h1") {
       elements.push(
-        <text key={key} fg={mode === "PLAN" ? colors.planMode : colors.primary} attributes={TextAttributes.BOLD}>
-          {stripInline(line.text)}
-        </text>
+        <box key={key} flexDirection="row" gap={1} alignItems="center">
+          <text fg={mode === "PLAN" ? colors.planMode : colors.primary}>▍</text>
+          <text fg={mode === "PLAN" ? colors.planMode : colors.primary} attributes={TextAttributes.BOLD}>
+            {stripInline(line.text)}
+          </text>
+        </box>
       );
       return;
     }
@@ -191,7 +202,7 @@ function MarkdownContent({
     }
 
     if (line.type === "bullet") {
-      const prefix = "  ".repeat(Math.floor(line.indent / 2)) + "• ";
+      const prefix = "  ".repeat(Math.floor(line.indent / 2)) + "› ";
       elements.push(
         <text key={key} wrapMode="word">
           {prefix + stripInline(line.text)}
@@ -246,7 +257,14 @@ export function BotMessage({
   return (
     <box width="100%" flexDirection="column">
       {toolCalls.length > 0 && (
-        <box flexDirection="column" width="100%" paddingTop={1} gap={0}>
+        <box
+          flexDirection="column"
+          width="100%"
+          paddingTop={1}
+          gap={0}
+          border={["left"]}
+          borderColor={colors.selection}
+        >
           {toolCalls.map((tc) => (
             <ToolCallItem key={tc.toolCallId} toolCall={tc} />
           ))}

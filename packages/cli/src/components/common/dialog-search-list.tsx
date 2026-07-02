@@ -82,16 +82,27 @@ export function DialogSearchList<T>({
 
     return (
         <box flexDirection="column" gap={1}>
-            <input
-                ref={inputRef}
-                placeholder={placeholder}
-                focused
-                onContentChange={handleContentChange}
-            />
+            <box
+                flexDirection="row"
+                alignItems="center"
+                gap={1}
+                paddingX={1}
+                backgroundColor={colors.surface}
+            >
+                <text fg={colors.dimSeparator}>⌕</text>
+                <input
+                    ref={inputRef}
+                    placeholder={placeholder}
+                    focused
+                    onContentChange={handleContentChange}
+                />
+            </box>
             {filtered.length === 0 ? (
-                <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
-                    {emptyText}
-                </text>
+                <box paddingY={1} paddingX={1}>
+                    <text attributes={TextAttributes.DIM} fg={colors.dimSeparator}>
+                        {emptyText}
+                    </text>
+                </box>
             ) : (
                 <scrollbox ref={scrollRef} height={visibleHeight}>
                     {filtered.map((item, i) => {
@@ -100,7 +111,9 @@ export function DialogSearchList<T>({
                             <box
                                 key={getKey(item)}
                                 flexDirection="row"
+                                alignItems="center"
                                 height={1}
+                                paddingX={1}
                                 overflow="hidden"
                                 backgroundColor={isSelected ? colors.selection : undefined}
                                 onMouseMove={() => {

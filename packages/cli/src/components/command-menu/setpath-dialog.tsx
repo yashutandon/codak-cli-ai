@@ -16,13 +16,13 @@ export function SetPathDialogContent({ currentCwd, onConfirm }: Props) {
   const { isTopLayer } = useKeyboardLayer()
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<InputRenderable>(null)
-const [path, setPath] = useState(currentCwd ?? "")
+  const [path, setPath] = useState(currentCwd ?? "")
 
-useEffect(() => {
-  if (inputRef.current && currentCwd) {
-    inputRef.current.setText(currentCwd)
-  }
-}, [])
+  useEffect(() => {
+    if (inputRef.current && currentCwd) {
+      inputRef.current.setText(currentCwd)
+    }
+  }, [])
 
   const handleConfirm = useCallback(() => {
     const trimmed = path.trim()
@@ -49,28 +49,41 @@ useEffect(() => {
       </text>
 
       {currentCwd && (
-        <text fg={colors.dimSeparator} attributes={TextAttributes.DIM}>
-          Current: {currentCwd}
-        </text>
+        <box flexDirection="row" gap={1}>
+          <text fg={colors.dimSeparator} attributes={TextAttributes.DIM}>Current:</text>
+          <text fg={colors.info} attributes={TextAttributes.DIM}>{currentCwd}</text>
+        </box>
       )}
 
-      <input
-  ref={inputRef}
-  placeholder="e.g. /home/user/my-project"
-  focused
-  onContentChange={() => {
-    setPath(inputRef.current?.plainText ?? "")
-    setError(null)
-  }}
-/>
+      <box
+        flexDirection="row"
+        alignItems="center"
+        gap={1}
+        paddingX={1}
+        backgroundColor={colors.surface}
+      >
+        <text fg={colors.primary}>📁</text>
+        <input
+          ref={inputRef}
+          placeholder="e.g. /home/user/my-project"
+          focused
+          onContentChange={() => {
+            setPath(inputRef.current?.plainText ?? "")
+            setError(null)
+          }}
+        />
+      </box>
 
       {error && (
-        <text fg={colors.error}>{error}</text>
+        <box flexDirection="row" gap={1}>
+          <text fg={colors.error}>✖</text>
+          <text fg={colors.error}>{error}</text>
+        </box>
       )}
 
       <box flexDirection="row" gap={2} marginTop={1}>
         <text fg={colors.primary} attributes={TextAttributes.DIM}>
-          enter to confirm · esc to cancel
+          ⏎ confirm · esc cancel
         </text>
       </box>
     </box>
