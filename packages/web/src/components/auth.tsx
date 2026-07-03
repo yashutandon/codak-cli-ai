@@ -110,7 +110,7 @@ export default function LoginPage() {
       }
 
       toast.success(isRegister ? "Account created!" : "Welcome back!", toastId);
-      redirectToCLI(json.data.accessToken);
+      redirectToCLI(json.data.accessToken, json.data.refreshToken ?? "");
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Something went wrong",
@@ -127,16 +127,24 @@ export default function LoginPage() {
     window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/${provider}?${params}`;
   };
 
- const redirectToCLI = (token: string) => {
+ const redirectToCLI = (token: string, refreshToken = "") => {
   if (!state) {
-    toast.error("No CLI state found. Please try again from the CLI.");
+    // Web-only login
+    localStorage.setItem("accessToken", token);
+    if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
+    window.location.href = "/";
     return;
   }
   try {
     const payload = JSON.parse(atob(state));
     const port = payload.port;
     if (!port) throw new Error("Invalid port");
-    window.location.href = `http://localhost:${port}/callback?token=${encodeURIComponent(token)}&state=${encodeURIComponent(state)}`;
+    const params = new URLSearchParams({
+      token,
+      state,
+      ...(refreshToken ? { refreshToken } : {}),
+    });
+    window.location.href = `http://localhost:${port}/callback?${params}`;
   } catch (e) {
     console.error("redirect error:", e);
     toast.error("Invalid auth state. Please try again from the CLI.");
@@ -309,9 +317,11 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <p className="mt-6 text-center text-xs text-white/20">
-          Authenticating for CLI session
-        </p>
+        {state && (
+          <p className="mt-6 text-center text-xs text-white/20">
+            Authenticating for CLI session
+          </p>
+        )}
       </div>
     </div>
   );

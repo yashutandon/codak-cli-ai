@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "Running typechecks across the monorepo..."
+bun run typecheck || { echo "Typecheck failed!"; exit 1; }
+
+echo "Running backend API tests..."
+bun run test || { echo "Tests failed!"; exit 1; }
+
+echo "All checks passed! Proceeding with commit."

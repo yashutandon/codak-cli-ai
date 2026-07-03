@@ -3,6 +3,15 @@ import type { AuthRequest } from "../../middleware/auth.middleware";
 import { sendMessage } from "./message.service";
 import { SendMessageSchema } from "./message.dto";
 import { AppError } from "../../../utils/AppError";
+import { resolveApproval } from "../../lib/tools/approval.service";
+import { setActiveStreamController } from "../../lib/tools/executor";
+import { z } from "zod";
+import { db } from "@codak/database";
+
+const ApprovalSchema = z.object({
+  toolCallId: z.string().min(1),
+  approved: z.boolean(),
+});
 
 export async function sendMessageHandler(
   req: Request<{ id: string }>,
@@ -41,7 +50,24 @@ export async function sendMessageHandler(
       return;
     }
 
-    // BUILD mode
+    // BUILD mode — wire SSE controller so executor can push approval events
+    const stream = new ReadableStream({
+      start(controller) {
+        setActiveStreamController(controller);
+      },
+    });
+
+    // Pipe tool-approval-required events from executor to res
+    (async () => {
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(decoder.decode(value));
+      }
+    })().catch(() => {});
+
     for await (const chunk of response.result.fullStream) {
       if (chunk.type === "text-delta") {
         write({ type: "text-delta", text: chunk.text });
@@ -69,11 +95,58 @@ export async function sendMessageHandler(
         if (text) write({ type: "reasoning-delta", text });
 
       } else if (chunk.type === "finish") {
-        write({ type: "done" });
+        const c = chunk as any;
+        const usage = c.usage || { promptTokens: 0, completionTokens: 0 };
+        const promptTokens = usage.promptTokens || 0;
+        const completionTokens = usage.completionTokens || 0;
+        const totalTokens = promptTokens + completionTokens;
+        
+        // Calculate approximate cost (can be moved to a config module later)
+        let cost = 0;
+        const modelName = parsed.data.model || "claude-3-5-sonnet";
+        if (modelName.includes("gpt-4o")) {
+          cost = (promptTokens * 5.0 / 1000000) + (completionTokens * 15.0 / 1000000);
+        } else if (modelName.includes("claude-3-5")) {
+          cost = (promptTokens * 3.0 / 1000000) + (completionTokens * 15.0 / 1000000);
+        }
+
+        // Save to DB asynchronously so it doesn't block stream finish
+        db.usageToken.create({
+          data: {
+            userId,
+            sessionId: req.params.id,
+            promptTokens,
+            completionTokens,
+            totalTokens,
+            cost,
+          }
+        }).catch((err: any) => console.error("Failed to track usage:", err));
+
+        write({ type: "done", usage });
       }
     }
 
+    setActiveStreamController(null);
     res.end();
+  } catch (err) {
+    setActiveStreamController(null);
+    next(err);
+  }
+}
+
+export async function approvalHandler(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = ApprovalSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return next(new AppError("toolCallId and approved are required", 400));
+    }
+
+    await resolveApproval(parsed.data.toolCallId, parsed.data.approved);
+    res.status(200).json({ success: true });
   } catch (err) {
     next(err);
   }

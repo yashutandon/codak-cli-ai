@@ -4,14 +4,20 @@
   "scripts": {
     "dev:cli": "bun run --watch  packages/cli/src/index.tsx",
     "dev:server": "bun run --watch  packages/server/src/index.ts",
-    "dev:web": "cd packages/web && bun run dev"
+    "dev:web": "cd packages/web && bun run dev",
+    "typecheck": "cd packages/server && bun run typecheck && cd ../web && bun run typecheck",
+    "test": "cd packages/server && bun run test",
+    "prepare": "husky"
   },
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "dependencies": {
     "glob": "^13.0.6",
     "react-router": "^7.17.0"
   },
   "devDependencies": {
-    "@types/glob": "^9.0.0"
+    "@types/glob": "^9.0.0",
+    "husky": "^9.1.7"
   }
 }

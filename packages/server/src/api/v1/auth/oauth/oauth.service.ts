@@ -1,9 +1,5 @@
-import jwt from "jsonwebtoken";
-import { randomBytes } from "crypto";
 import { db } from "@codak/database";
-
-const JWT_SECRET = process.env.JWT_SECRET!;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? "7d";
+import { signAccessToken, createRefreshToken } from "../auth.service";
 
 export interface OAuthProfile {
   id: string;
@@ -29,14 +25,12 @@ export async function findOrCreateOAuthUser(profile: OAuthProfile) {
       select: { id: true, email: true, name: true, isOAuthUser: true },
     });
   } else if (!user.isOAuthUser) {
-    // Existing email/password account — link OAuth but don't change password
-    // Just issue a token for the existing account
+    // Existing email/password account — just issue tokens (don't override password)
     console.log(`[OAuth] Existing account linked for: ${profile.email}`);
   }
 
-  const accessToken = jwt.sign({ sub: user.id }, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"],
-  });
+  const accessToken = signAccessToken(user.id);
+  const refreshToken = await createRefreshToken(user.id);
 
-  return { accessToken, user };
+  return { accessToken, refreshToken, user };
 }

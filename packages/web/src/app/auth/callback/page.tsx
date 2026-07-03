@@ -8,9 +8,18 @@ function CallbackHandler() {
 
   useEffect(() => {
     const token = searchParams.get("token");
+    const refreshToken = searchParams.get("refreshToken") ?? "";
     const state = searchParams.get("state");
 
-    if (!token || !state) {
+    if (!token) {
+      return;
+    }
+
+    if (!state) {
+      // Web-only login
+      localStorage.setItem("accessToken", token);
+      if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
+      window.location.href = "/";
       return;
     }
 
@@ -18,7 +27,13 @@ function CallbackHandler() {
       const payload = JSON.parse(atob(state));
       const port = payload.port;
       if (!port) throw new Error("Invalid port");
-      window.location.href = `http://localhost:${port}/callback?token=${encodeURIComponent(token)}&state=${encodeURIComponent(state)}`;
+      
+      const redirectUrl = new URL(`http://localhost:${port}/callback`);
+      redirectUrl.searchParams.set("token", token);
+      redirectUrl.searchParams.set("state", state);
+      if (refreshToken) redirectUrl.searchParams.set("refreshToken", refreshToken);
+      
+      window.location.href = redirectUrl.toString();
     } catch {
       // error handled in UI
     }
@@ -27,11 +42,11 @@ function CallbackHandler() {
   const token = searchParams.get("token");
   const state = searchParams.get("state");
 
-  if (!token || !state) {
+  if (!token) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#080810", color: "#fff", fontFamily: "monospace", flexDirection: "column", gap: "8px" }}>
         <p style={{ color: "#f87171" }}>Authentication failed.</p>
-        <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>Close this window and try again from the CLI.</p>
+        <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>Close this window and try again.</p>
       </div>
     );
   }
@@ -39,7 +54,9 @@ function CallbackHandler() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#080810", color: "#fff", fontFamily: "monospace", flexDirection: "column", gap: "12px" }}>
       <p style={{ color: "rgba(255,255,255,0.6)" }}>Completing authentication...</p>
-      <p style={{ color: "rgba(255,255,255,0.2)", fontSize: "12px" }}>Redirecting back to CLI...</p>
+      <p style={{ color: "rgba(255,255,255,0.2)", fontSize: "12px" }}>
+        {state ? "Redirecting back to CLI..." : "Redirecting..."}
+      </p>
     </div>
   );
 }

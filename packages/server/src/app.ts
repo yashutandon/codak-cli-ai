@@ -1,5 +1,8 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import compression from "compression";
+import { rateLimit } from "express-rate-limit";
 import "dotenv/config";
 
 import v1Router from "./api/v1";
@@ -11,6 +14,23 @@ export const app = express();
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : ["http://localhost:5173", "http://localhost:3000"];
+
+// Security Headers
+app.use(helmet());
+
+// Gzip Compression
+app.use(compression());
+
+// Global Rate Limiting (Basic protection against DDoS)
+// Note: Specific routes like auth or heavy processing can have stricter local limits
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 1000, // Limit each IP to 1000 requests per `window`
+  standardHeaders: "draft-7", 
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." }
+});
+app.use(globalLimiter);
 
 app.use(
   cors({

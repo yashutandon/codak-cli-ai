@@ -10,7 +10,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ensureAuthenticated } from "./auth";
 import { config } from "dotenv";
 import { resolve } from "path";
+import { checkForUpdate } from "./helpers/update-notifier";
 config({ path: resolve(import.meta.dirname, "../.env") });
+
+// Fire-and-forget — check NPM for updates in background
+checkForUpdate();
 
 // Auth check before rendering
 await ensureAuthenticated();

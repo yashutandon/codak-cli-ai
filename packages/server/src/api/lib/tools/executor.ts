@@ -7,6 +7,7 @@ import { createDirectoryTool } from "./create-dir";
 import { deleteFileTool } from "./delete-file";
 import { searchFilesTool } from "./search-files";
 import { validateToolCall } from "./validate-toolcall";
+import { waitForApproval } from "./approval.service";
 import { db } from "@codak/database";
 import type { ToolName } from "@codak/shared";
 import { triggerReindex } from "../../infra/embeddings";
@@ -18,6 +19,43 @@ import {
   gitLogTool,
   gitCreateBranchTool,
 } from "./git";
+import { randomUUID } from "crypto";
+
+/**
+ * Tools that require explicit user confirmation before execution.
+ * These are destructive or potentially irreversible actions.
+ */
+const APPROVAL_REQUIRED_TOOLS: Set<ToolName> = new Set([
+  "delete_file",
+  "run_command",
+  "git_commit",
+  "git_checkout",
+  "git_create_branch",
+]);
+
+/**
+ * SSE stream reference — set by the message controller so the executor
+ * can push an approval-request event to the CLI.
+ */
+let activeStreamController: ReadableStreamDefaultController | null = null;
+
+export function setActiveStreamController(
+  controller: ReadableStreamDefaultController | null
+) {
+  activeStreamController = controller;
+}
+
+function pushSSEEvent(data: object) {
+  if (!activeStreamController) return;
+  try {
+    const encoder = new TextEncoder();
+    activeStreamController.enqueue(
+      encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
+    );
+  } catch {
+    // Stream may already be closed
+  }
+}
 
 export async function executeTool(
   name: ToolName,
@@ -30,6 +68,25 @@ export async function executeTool(
     throw new Error(`[Firewall] Tool blocked — ${check.reason}`);
   }
 
+  // ── Dangerous tools require user approval via CLI ──────────────
+  if (APPROVAL_REQUIRED_TOOLS.has(name)) {
+    const toolCallId = randomUUID();
+
+    pushSSEEvent({
+      type: "tool-approval-required",
+      toolCallId,
+      toolName: name,
+      args,
+    });
+
+    const approved = await waitForApproval(toolCallId);
+
+    if (!approved) {
+      const reason = `User rejected execution of '${name}'`;
+      throw new Error(`[Approval] ${reason}`);
+    }
+  }
+
   const startTime = Date.now();
   let result: string;
 
@@ -39,7 +96,7 @@ export async function executeTool(
       case "write_file":       result = await writeFileTool(args as any, cwd); break;
       case "edit_file":        result = await editFileTool(args as any, cwd); break;
       case "list_files":       result = await listFilesTool(args as any, cwd); break;
-      case "run_command": result = await runCommandTool(args as any, cwd, sessionId); break;
+      case "run_command":      result = await runCommandTool(args as any, cwd, sessionId); break;
       case "create_directory": result = await createDirectoryTool(args as any, cwd); break;
       case "delete_file":      result = await deleteFileTool(args as any, cwd); break;
       case "search_files":     result = await searchFilesTool(args as any, cwd); break;

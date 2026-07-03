@@ -25,6 +25,12 @@ enum MessageStatus {
   INTERRUPTED
 }
 
+enum SubscriptionTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
 model ToolExecution {
   id        String   @id @default(cuid())
   sessionId String
@@ -54,16 +60,34 @@ model CodeChunk {
 }
 
 model User {
-  id          String    @id @default(cuid())
-  email       String    @unique
-  name        String?
-  password    String?   // null for OAuth users
-  isOAuthUser Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  sessions    Session[]
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String?
+  password      String?        // null for OAuth users
+  isOAuthUser   Boolean        @default(false)
+  tier          SubscriptionTier @default(FREE)
+  razorpayCustomerId String?   @unique
+  razorpaySubscriptionId String? @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  sessions      Session[]
+  refreshTokens RefreshToken[]
+  usageTokens   UsageToken[]
 
   @@index([email])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique  // bcrypt hash of the raw token
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?           // null = active
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
 }
 
 model Session {
@@ -76,6 +100,7 @@ model Session {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   messages       Message[]
+  usageTokens    UsageToken[]
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -95,5 +120,22 @@ model Message {
   createdAt DateTime      @default(now())
   session   Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
+  @@index([sessionId])
+}
+
+model UsageToken {
+  id               String   @id @default(cuid())
+  userId           String
+  sessionId        String?
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  cost             Float?   @default(0.0) // Optionally track USD/INR cost based on model pricing
+  createdAt        DateTime @default(now())
+  
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session          Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
   @@index([sessionId])
 }

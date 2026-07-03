@@ -1,10 +1,5 @@
-import { appendFileSync } from "fs";
 import { apiFetch, BASE_URL } from "../api";
 import { getToken, clearToken, ensureAuthenticated } from "../../auth";
-
-function log(msg: string) {
-  appendFileSync("C:/tmp/codak-debug.log", msg + "\n");
-}
 
 export type ToolCall = {
   toolCallId: string;
@@ -17,28 +12,33 @@ export type ToolResult = {
   result: string;
 };
 
+export type ApprovalRequest = {
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+};
+
 export async function sendMessage(
   sessionId: string,
   content: string,
+  images: string[] | undefined,
   model: string,
   mode: "BUILD" | "PLAN" = "BUILD",
   onChunk: (text: string) => void,
   onToolCall: (toolCall: ToolCall) => void,
   onToolResult: (toolResult: ToolResult) => void,
-  onDone: () => void,
-  onError: (err: string) => void
+  onDone: (usage?: { promptTokens: number; completionTokens: number }) => void,
+  onError: (err: string) => void,
+  onApprovalRequired?: (request: ApprovalRequest) => void
 ): Promise<void> {
   try {
-    log(`[sendMessage] called — sessionId=${sessionId} content=${content.slice(0, 30)}`);
-
     let res = await apiFetch(`/sessions/${sessionId}/messages`, {
       method: "POST",
-      body: JSON.stringify({ content, model, mode }),
+      body: JSON.stringify({ content, model, mode, images }),
     });
 
     // 401 already handled by apiFetch — but double check
     if (res.status === 401) {
-      log(`[sendMessage] 401 after retry — re-authenticating`);
       await clearToken();
       await ensureAuthenticated();
       const token = await getToken();
@@ -48,14 +48,11 @@ export async function sendMessage(
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ content, model, mode }),
+        body: JSON.stringify({ content, model, mode, images }),
       });
     }
 
-    log(`[sendMessage] response status=${res.status}`);
-
     if (!res.ok) {
-      log(`[sendMessage] not ok — ${res.status}`);
       onError(`HTTP ${res.status}`);
       return;
     }
@@ -64,20 +61,15 @@ export async function sendMessage(
     const decoder = new TextDecoder();
 
     if (!reader) {
-      log(`[sendMessage] no reader`);
       onError("No response body");
       return;
     }
 
     let buffer = "";
-    let chunkCount = 0;
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) {
-        log(`[sendMessage] reader done — chunks=${chunkCount} buffer="${buffer.slice(0, 50)}"`);
-        break;
-      }
+      if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
@@ -90,10 +82,8 @@ export async function sendMessage(
 
         try {
           const json = JSON.parse(raw);
-          log(`[event] type=${json.type}`);
 
           if (json.type === "text-delta") {
-            chunkCount++;
             onChunk(json.text ?? "");
           } else if (json.type === "tool-call") {
             onToolCall({
@@ -106,24 +96,40 @@ export async function sendMessage(
               toolCallId: json.toolCallId,
               result: String(json.result ?? ""),
             });
+          } else if (json.type === "tool-approval-required") {
+            // Notify the UI — response will be sent separately
+            onApprovalRequired?.({
+              toolCallId: json.toolCallId,
+              toolName: json.toolName,
+              args: json.args ?? {},
+            });
           } else if (json.type === "done") {
-            log(`[sendMessage] DONE — chunks=${chunkCount}`);
-            onDone();
+            onDone(json.usage);
             return;
           } else if (json.type === "error") {
-            log(`[sendMessage] ERROR — ${json.message}`);
             onError(json.message ?? "Unknown error");
             return;
           }
-        } catch (e) {
-          log(`[parse error] raw="${raw.slice(0, 80)}" err=${e}`);
+        } catch {
+          // Ignore parse errors for malformed SSE lines
         }
       }
     }
-
-    log(`[sendMessage] loop ended without done event`);
   } catch (err) {
-    log(`[sendMessage] catch — ${err instanceof Error ? err.message : String(err)}`);
     onError(err instanceof Error ? err.message : "Network error");
   }
+}
+
+/**
+ * Send the user's approval or rejection back to the server.
+ */
+export async function sendApproval(
+  sessionId: string,
+  toolCallId: string,
+  approved: boolean
+): Promise<void> {
+  await apiFetch(`/sessions/${sessionId}/messages/approve`, {
+    method: "POST",
+    body: JSON.stringify({ toolCallId, approved }),
+  });
 }

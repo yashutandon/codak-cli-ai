@@ -1,222 +1,148 @@
-# Codak
+<div align="center">
+  <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/terminal.svg" width="60" alt="Codak AI Logo" />
+  <h1 align="center">Codak AI</h1>
+  <p align="center"><strong>Production-Grade, Rules-First Autonomous AI Software Engineer</strong></p>
+  
+  <p align="center">
+    <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-%23000000.svg?style=for-the-badge&logo=bun&logoColor=white" alt="Bun 1.3+" /></a>
+    <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js_16-black?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js 16" /></a>
+    <a href="https://react.dev/"><img src="https://img.shields.io/badge/React_19-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB" alt="React 19" /></a>
+    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript_6-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript 6" /></a>
+    <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind_CSS_v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind 4" /></a>
+    <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL_pgvector-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="Postgres" /></a>
+    <a href="https://vitest.dev/"><img src="https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" alt="Vitest" /></a>
+  </p>
+</div>
 
-**Your codebase-aware autonomous software engineer.**
+<br />
 
-Codak is not a chat interface. It is an engineer — one that understands your project, remembers how you work, writes production-ready code, and fixes its own mistakes. It lives in your terminal, works on any project, and gets smarter the longer you use it.
+Codak AI is an advanced, terminal-native autonomous coding agent engineered to solve the most critical flaw in modern AI coding assistants: **context ignorance**. 
 
----
-
-## 🧠 Project Memory
-
-Codak remembers your project across every session.
-
-Most AI tools forget everything the moment you close the tab. Codak doesn't. It builds and maintains a persistent memory of your project — package manager, framework, conventions, decisions — stored in Redis and injected into every conversation automatically.
-
-You never have to say "this is a Bun project" or "we use Zod for validation" twice.
-
-```
-Session 1: "This project uses Bun and Prisma"
-Session 2: Codak already knows. No re-explaining needed.
-```
-
----
-
-## 🔍 Code Intelligence (RAG)
-
-Codak reads your codebase before it responds.
-
-When you ask Codak to do something, it doesn't guess. It first retrieves the most relevant parts of your codebase using vector similarity search — then grounds its response in what's actually there.
-
-- Files are chunked (150-line segments, 20-line overlap) and embedded using Google's `gemini-embedding-001` (3072-dim vectors)
-- Every message triggers a cosine similarity search via `pgvector` — top-5 most relevant chunks are injected into context
-- Every file Codak edits is automatically re-indexed — context is always fresh, never stale
-
-The result: Codak writes code that matches your patterns, imports from your actual modules, and uses your existing utilities — not generic boilerplate.
+Unlike standard chat interfaces that generate generic, hallucinated boilerplate, Codak integrates deeply into your local environment. It utilizes a **Hybrid Retrieval-Augmented Generation (RAG)** pipeline to dynamically fetch codebase context, enforces strict architectural constraints via `.codakrules`, and features a self-healing execution loop capable of autonomously resolving build errors.
 
 ---
 
-## 🔁 Self-Healing Workflows
+## 🎯 The Problem vs. The Codak Solution
 
-Codak doesn't stop at "here's the code." It verifies it works.
-
-After every change, Codak runs your build and tests. If something breaks, it reads the error, finds the root cause, fixes the specific file, and retries — up to 3 times, automatically.
-
-```
-Write code
-   ↓
-Run build
-   ↓
-Error? → Read stderr → Fix root cause → Retry
-   ↓
-Success → Report done
-```
-
-It detects your package manager automatically (`bun`, `pnpm`, `yarn`, `npm`) from lockfiles and uses the right commands throughout.
+| Traditional AI Assistants | Codak AI |
+| :--- | :--- |
+| Generate generic, isolated code snippets. | **Context-Aware:** Analyzes your local workspace via Vector Similarity Search before writing a single line of code. |
+| Violate project architecture and styling rules. | **Rules-First:** Strictly obeys `.codakrules` (e.g., "Always use App Router", "Never use raw CSS"). |
+| Require manual copy-pasting and context feeding. | **Autonomous:** Lives in your terminal. Modifies files directly with explicit Y/N safety prompts. |
+| Fail silently when their code throws type errors. | **Self-Healing:** Runs your build commands, parses `stderr`, identifies the root cause, and fixes its own mistakes. |
+| Text-only limitations. | **Multimodal Vision:** Processes UI screenshots/mockups (`.png`, `.jpg`, `.webp`) and implements the required CSS/React code. |
 
 ---
 
-## 🤝 Multi-Agent Execution
+## 🏗️ System Architecture & Engineering 
 
-Simple tasks go straight to execution. Complex tasks get broken down.
+Codak is architected as a high-performance, enterprise-ready Monorepo utilizing **Bun Workspaces**.
 
-Codak's Orchestrator analyzes incoming requests and decides how to handle them:
-
-- **Simple** — a single tool-calling agent handles it end to end, streamed live
-- **Complex** — broken into sub-tasks, each handled by a specialized Coding agent, then reviewed by a Review agent that checks for bugs, type errors, and security issues before the result is returned
-
-There's also a dedicated **PLAN mode** — Codak analyzes your request and returns a structured plan (Goal, Steps, Dependencies, Risks) with zero file changes. Review it, then switch to BUILD mode to execute.
-
+### High-Level Flow
+```mermaid
+graph TD;
+    CLI[Codak CLI User] -->|SSE Stream / CLI Cmd| API(Express 5 API Gateway)
+    API -->|Auth / Rate Limit| AuthMiddleware(JWT / OAuth)
+    API -->|Task Delegation| BullMQ(BullMQ Worker Queue)
+    API -->|Vector Search| DB[(PostgreSQL + pgvector)]
+    DB -->|Embeddings| RAG(Hybrid RAG Engine)
+    API <-->|LLM Stream| VercelAI(Vercel AI SDK 6.0)
+    VercelAI -->|Tool Calling| Sandbox(Docker Execution Sandbox)
+    Sandbox -->|Files / Cmds| CLI
+    Web[Next.js 16 Web Dashboard] -->|User Settings / Tokens| API
 ```
-@plan  →  structured analysis, no changes
-@build →  full execution with tools
-```
+
+### ⚙️ The Tech Stack (Bleeding Edge)
+- **Monorepo / Runtime:** Bun 1.3+ (Ultra-fast package management and execution)
+- **Backend API:** Express 5.2.1, Server-Sent Events (SSE) for real-time LLM token streaming
+- **AI Orchestration:** Vercel AI SDK 6.0 (`ai` package) with dynamic tool calling and multi-agent delegation (OpenAI, Anthropic, Google Gemini, Groq).
+- **Background Jobs:** BullMQ 5.79 for robust, asynchronous task queuing and scheduled telemetry.
+- **Database:** Prisma 7.8.0 interacting with a Neon Serverless PostgreSQL database.
+- **Vector Database (RAG):** `pgvector` for executing rapid cosine similarity searches on 3072-dimensional embeddings (`gemini-embedding-001`).
+- **Caching & State:** Redis / ioredis (Upstash) for session state, rate limiting, and BullMQ persistence.
+- **Frontend / Dashboard:** Next.js 16.2.7 (App Router), React 19.2.4 (React Compiler enabled), and Tailwind CSS v4 for a highly optimized, client-side dynamic dashboard.
+- **Security & QA:** Helmet 8, Express Rate Limit, JWT + bcrypt, Husky Git Hooks, and Vitest Integration suites.
 
 ---
 
-## 🛡️ Safe by Default
+## ✨ Core Engineering Features
 
-Every action Codak takes passes through a safety layer before execution.
+### 1. Hybrid RAG Codebase Intelligence
+Codak chunks your repository files (150-line segments with 20-line overlaps) and generates embeddings. When a prompt is received, Codak performs a semantic search against your codebase using `pgvector`. This ensures the LLM is grounded in your *actual* project structure, utilizing your existing utility functions and types.
 
-- **Firewall** — `rm -rf`, `sudo`, disk formatting, path traversal, and shutdown commands are blocked unconditionally
-- **Scoped access** — all file operations resolve relative to your project directory. Codak cannot touch anything outside it
-- **Docker sandbox** — shell commands optionally run inside an isolated container (`--network=none`, `--memory=512m`) that is destroyed after each message
-- **Audit log** — every tool call (arguments, result, duration, errors) is persisted to Postgres for full observability
+### 2. The `.codakrules` Engine
+By placing a `.codakrules` file in the repository root, developers define immutable system constraints. This is critical for enterprise environments where consistency is paramount. The backend dynamically merges these rules into the system prompt at runtime.
 
----
+### 3. Isolated Docker Sandboxing
+To ensure zero-trust execution, shell commands can be isolated. We execute the LLM's proposed bash commands inside a locked-down Docker container. Network access is disabled, and memory is strictly limited, neutralizing the risk of hallucinated destructive commands (`rm -rf`, `wget malicious_script`).
 
-## ⚡ Everything else
+### 4. Multimodal Vision Pipeline
+Codak bridges the gap between design and code. By providing an image path (e.g., `codak "Fix this alignment" ./bug.png`), the CLI converts the image to base64, streams it to the API, and utilizes multimodal LLMs (like GPT-4o or Claude 3.5 Sonnet) to visually analyze and correct UI layout issues.
 
-- **Surgical edits** — `edit_file` replaces an exact string, not the whole file
-- **Full git workflow** — status, diff, commit, branch, log, checkout — all via native tool calls
-- **Multi-provider models** — Anthropic, OpenAI, Google Gemini, Groq — switch with `@models`
-- **React terminal UI** — built with `@opentui/react`, full keyboard navigation, live streaming
-- **Browser-callback OAuth** — GitHub + Google auth without storing credentials in the CLI
+### 5. Real-Time Token & Billing Telemetry
+Every interaction tracks token usage dynamically. The API aggregates prompt/completion tokens and synchronizes them via BullMQ to the Postgres database, ensuring accurate billing logic and usage limit enforcement for different subscription tiers (Free, Pro, Enterprise).
 
----
-
-## 🏗️ Architecture
-
-```
-codak-cli-ai/
-├── packages/
-│   ├── cli/        # Terminal UI — @opentui/react
-│   ├── server/     # Express API — agent orchestration, tools, RAG
-│   ├── web/        # Next.js — auth page (browser callback)
-│   ├── database/   # Prisma + Neon Postgres + pgvector
-│   └── shared/     # Types, tool definitions, model registry
-```
-
-| Layer | Technology |
-|-------|------------|
-| Runtime | Bun |
-| CLI UI | React + `@opentui/react` |
-| API | Express, Server-Sent Events |
-| AI | Vercel AI SDK — Anthropic, OpenAI, Google, Groq |
-| Database | PostgreSQL (Neon) + pgvector, Prisma ORM |
-| RAG | `gemini-embedding-001` (3072-dim), pgvector cosine search |
-| Memory / Cache | Redis — project memory (7-day TTL) + session cache (5-min TTL) |
-| Sandbox | Docker — network-disabled, resource-limited, per-message |
-| Auth | JWT + bcrypt, browser-callback OAuth (GitHub / Google) |
+### 6. Automated Testing & Git Hooks
+Codak enforces strict code quality via Husky and Vitest. Every `git commit` triggers a robust `pre-commit` hook that executes monorepo-wide TypeScript static analysis (`tsc --noEmit`) and runs the backend integration test suite. This guarantees that broken code or API regressions are intercepted before entering version control.
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-
 - [Bun](https://bun.sh) 1.3+
-- PostgreSQL with [pgvector](https://github.com/pgvector/pgvector) — [Neon](https://neon.tech) free tier works
-- Redis — [Upstash](https://upstash.com) free tier works
-- At least one LLM provider API key
-- (Optional) Docker for sandboxed command execution
+- PostgreSQL with `pgvector` enabled (Neon free tier is ideal).
+- Redis Server (Upstash free tier).
+- API Keys for your preferred LLM provider.
 
-### Install
+### Installation & Setup
 
+1. **Clone & Install**
+   ```bash
+   git clone https://github.com/yashutandon/codak-cli-ai.git
+   cd codak-cli-ai
+   bun install
+   ```
+
+2. **Environment Variables**  
+   Configure your `.env` files in `packages/server`, `packages/cli`, and `packages/web` using the provided `.env.example` templates. Key variables include `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, and `OPENAI_API_KEY`.
+
+3. **Database Migration**
+   ```bash
+   cd packages/database
+   bunx prisma generate
+   bunx prisma db push
+   ```
+
+4. **Launch the Monorepo**
+   ```bash
+   # Starts the Express API (:3001), Next.js Dashboard (:3000), and the CLI
+   bun run dev:server
+   bun run dev:web
+   bun run dev:cli
+   ```
+
+### Authentication
+Codak utilizes a browser-callback OAuth flow. Run the following command in your terminal to securely authenticate without storing credentials locally:
 ```bash
-git clone https://github.com/yashutandon/codak-cli-ai.git
-cd codak-cli-ai
-bun install
+codak login
 ```
-
-### Environment variables
-
-**`packages/server/.env`**
-```env
-DATABASE_URL=postgresql://<user>:<password>@<host>/<db>?sslmode=require
-JWT_SECRET=<a-long-random-secret>
-JWT_EXPIRES_IN=7d
-REDIS_URL=rediss://<user>:<password>@<host>:6380
-
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_GENERATIVE_AI_API_KEY=AIza...
-GROQ_API_KEY=gsk_...
-
-PORT=3001
-```
-
-**`packages/cli/.env`**
-```env
-CODAK_WEB_URL=http://localhost:3000
-CODAK_API_URL=http://localhost:3001
-```
-
-**`packages/web/.env.local`**
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3001
-```
-
-### Database
-
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-```
-
-```bash
-cd packages/database
-bunx prisma generate
-bunx prisma db push
-```
-
-### Run
-
-```bash
-bun run dev:server   # API on :3001
-bun run dev:web      # Auth page on :3000
-bun run dev:cli      # Terminal UI
-```
-
-On first run, the CLI opens your browser for authentication. Once signed in, you're in.
 
 ---
 
-## ⌨️ Commands
+## ⌨️ CLI Reference
 
 | Command | Description |
 |---------|-------------|
-| `@new` | Start a new session |
-| `@open` | Browse and resume an existing session |
-| `@close` | Return to home |
-| `@build` / `@plan` | Switch agent mode (or press `Tab`) |
-| `@models` | Switch the active model |
-| `@setpath` | Set the project directory for this session |
-| `@theme` | Change color theme |
-| `@logout` | Sign out |
-| `@help` | List all commands |
-| `@exit` | Quit |
-
----
-
-## 🗺️ Roadmap
-
-- [ ] `codak.md` — project-level rules the agent loads automatically
-- [ ] Ollama support — local models, no API key required
-- [ ] VS Code extension
-- [ ] `npm install -g codak-cli` distribution
-- [ ] Model-per-agent configuration
+| `codak "<prompt>"` | Evaluates the codebase and executes the requested task. |
+| `codak "<prompt>" ./img.png` | Vision Mode: Analyzes the image along with the prompt. |
+| `codak login` | Initiates the secure OAuth/Email login flow. |
+| `codak logout` | Terminates the active session and clears tokens. |
+| `codak whoami` | Displays authenticated user, subscription tier, and token usage. |
+| `@plan` | Terminal UI Shortcut: Analyzes the task and outputs a plan *without* execution. |
+| `@build` | Terminal UI Shortcut: Swaps into full execution mode. |
 
 ---
 
 ## 📄 License
-
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

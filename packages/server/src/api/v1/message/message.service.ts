@@ -13,6 +13,7 @@ import { runMultiAgent, runPlanner } from "../../service/planner.service";
 import { updateProjectMemory, buildMemoryContext } from "../../service/project-memory";
 import { loadCodakRules, invalidateCodakRulesCache } from "../../service/codak-rules.service";
 import { detectComplexity } from "../../infra/agents/orchestrator";
+import { findSupportedChatModel } from "@codak/shared";
 
 const SESSION_CACHE_TTL = 60 * 5;
 
@@ -144,7 +145,7 @@ export async function sendMessage(
 
   // ─── PLAN mode ─────────────────────────────────────────────────
   if (data.mode === "PLAN") {
-    const plan = await runPlanner(data.content, cwd, fullContext, data.model, history);
+    const plan = await runPlanner(data.content, cwd, fullContext, data.model, history, data.images);
 
     await db.message.create({
       data: {
@@ -167,7 +168,7 @@ export async function sendMessage(
   const isComplex = detectComplexity(data.content);
 
   if (isComplex) {
-    const result = await runMultiAgent(data.content, cwd, fullContext, data.model, history);
+    const result = await runMultiAgent(data.content, cwd, fullContext, data.model, history, data.images);
 
     await db.message.create({
       data: {
@@ -185,17 +186,45 @@ export async function sendMessage(
     return { isPlanner: true, planStream: toSSEStream(result) };
   }
 
-  // ─── BUILD mode — simple task (direct streaming) ───────────────
+  const currentUserMessage = data.images?.length
+    ? {
+        role: "user" as const,
+        content: [
+          { type: "text" as const, text: data.content },
+          ...data.images.map((img) => ({ type: "image" as const, image: img })),
+        ],
+      }
+    : { role: "user" as const, content: data.content };
+
   const result = streamText({
     model: getModel(data.model),
     system: getSystemPrompt(cwd, fullContext, pm.name),
-    messages: [...history, { role: "user" as const, content: data.content }],
+    messages: [...history, currentUserMessage],
     tools: buildTools(cwd, sessionId),
     // @ts-ignore
     stopWhen: stepCountIs(10),
-    onFinish: async ({ text, steps }) => {
+    onFinish: async ({ text, steps, usage }) => {
       const finalContent =
         steps.map((s: any) => s.text ?? "").filter(Boolean).join("\n").trim() || text || "";
+
+      // Calculate cost in USD
+      const modelDef = findSupportedChatModel(data.model);
+      const pricing = modelDef?.pricing;
+      let costUsd: number | undefined;
+      if (pricing && usage) {
+        costUsd =
+          ((usage.inputTokens ?? 0) * pricing.inputUsedMillionTokens) / 1_000_000 +
+          ((usage.outputTokens ?? 0) * pricing.outputUsedMillionTokens) / 1_000_000;
+      }
+
+      const part = usage
+        ? {
+            promptTokens: usage.inputTokens ?? 0,
+            completionTokens: usage.outputTokens ?? 0,
+            totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
+            costUsd,
+          }
+        : undefined;
 
       await db.message.create({
         data: {
@@ -206,6 +235,7 @@ export async function sendMessage(
           model: data.model,
           status: "COMPLETE",
           title: "",
+          part: part ?? undefined,
         },
       });
 
@@ -216,9 +246,9 @@ export async function sendMessage(
           .map((tc: any) => String(tc.args?.path ?? tc.input?.path ?? ""))
       );
 
-      if (editedFiles.some((f) => f.endsWith("codak.md"))) {
+      if (editedFiles.some((f) => f.endsWith(".codakrules") || f.endsWith(".codak") || f.endsWith("codak.md"))) {
         await invalidateCodakRulesCache(cwd);
-        console.log("[codak.md] Cache invalidated after agent edit");
+        console.log("[rules] Cache invalidated after agent edit");
       }
 
       await invalidateSessionCache(sessionId, userId);

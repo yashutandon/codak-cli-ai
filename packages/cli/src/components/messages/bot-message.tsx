@@ -17,6 +17,12 @@ type Props = {
   toolCalls?: ToolCallWithResult[];
   streaming?: boolean;
   durationMs?: number;
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    costUsd?: number;
+  };
 };
 
 const TOOL_LABELS: Record<string, string> = {
@@ -249,6 +255,7 @@ export function BotMessage({
   toolCalls = [],
   streaming = false,
   durationMs,
+  tokenUsage,
 }: Props) {
   const { colors } = useTheme();
 
@@ -293,6 +300,14 @@ export function BotMessage({
           {durationMs !== undefined ? (
             <text fg={colors.dimSeparator} attributes={TextAttributes.DIM}>
               {"· " + prettyMs(durationMs)}
+            </text>
+          ) : null}
+          {tokenUsage && !streaming ? (
+            <text fg={colors.dimSeparator} attributes={TextAttributes.DIM}>
+              {`· ${tokenUsage.totalTokens.toLocaleString()} tok`}
+              {tokenUsage.costUsd !== undefined && tokenUsage.costUsd > 0
+                ? ` · $${tokenUsage.costUsd.toFixed(4)}`
+                : ""}
             </text>
           ) : null}
         </box>

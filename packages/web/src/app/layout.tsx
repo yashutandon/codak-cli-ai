@@ -14,8 +14,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Codak AI — Agentic Coding CLI",
-  description: "Next-gen AI coding assistant that lives in your terminal.",
+  title: "Codak AI | The Rules-First Autonomous Coding Agent",
+  description: "An enterprise-grade, terminal-native AI agent that strictly follows your team's architectural rules, features multimodal vision for UI fixes, and guarantees safe command execution.",
+  keywords: ["AI coding agent", "CLI", "Developer Tools", "Hybrid RAG", "Code Generation", "Autonomous Agent"],
+  authors: [{ name: "Codak Team" }],
+  openGraph: {
+    title: "Codak AI | The Rules-First Autonomous Coding Agent",
+    description: "The AI agent that actually respects your codebase architecture. Features rule-injection, vision support, and strict command firewalls.",
+    url: "https://codak.ai",
+    siteName: "Codak AI",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Codak AI | The Rules-First Autonomous Coding Agent",
+    description: "The AI agent that actually respects your codebase architecture.",
+  },
 };
 
 export default function RootLayout({
