@@ -1,6 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
 import { findOrCreateOAuthUser } from "./oauth.service";
 import { AppError } from "../../../../utils/AppError";
+import { redis } from "../../../infra/redis/redis";
+import { randomBytes } from "crypto";
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
@@ -11,11 +13,14 @@ const WEB_URL = process.env.WEB_URL ?? "http://localhost:3000";
 // ── GitHub ────────────────────────────────────────────────────
 
 export async function githubInit(req: Request, res: Response): Promise<void> {
-  const state = req.query.state as string ?? "";
+  const clientState = req.query.state as string ?? "";
+  const nonce = randomBytes(16).toString("hex");
+  await redis.setex(`oauth:state:${nonce}`, 300, clientState);
+
   const params = new URLSearchParams({
     client_id: GITHUB_CLIENT_ID,
     scope: "user:email",
-    state,
+    state: nonce,
   });
   res.redirect(`https://github.com/login/oauth/authorize?${params}`);
 }
@@ -26,9 +31,14 @@ export async function githubCallback(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { code, state } = req.query as { code: string; state: string };
+    const { code, state: nonce } = req.query as { code: string; state: string };
 
     if (!code) throw new AppError("No code received from GitHub", 400);
+    if (!nonce) throw new AppError("Missing state parameter (CSRF)", 400);
+
+    const clientState = await redis.get(`oauth:state:${nonce}`);
+    if (clientState === null) throw new AppError("Invalid or expired state parameter (CSRF)", 400);
+    await redis.del(`oauth:state:${nonce}`);
 
     // Exchange code for access token
     const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
@@ -85,7 +95,7 @@ export async function githubCallback(
     // Redirect back to web with token
     const params = new URLSearchParams({
       token: result.accessToken,
-      state: state ?? "",
+      state: clientState ?? "",
     });
 
     res.redirect(`${WEB_URL}/auth/callback?${params}`);
@@ -97,13 +107,16 @@ export async function githubCallback(
 // ── Google ────────────────────────────────────────────────────
 
 export async function googleInit(req: Request, res: Response): Promise<void> {
-  const state = req.query.state as string ?? "";
+  const clientState = req.query.state as string ?? "";
+  const nonce = randomBytes(16).toString("hex");
+  await redis.setex(`oauth:state:${nonce}`, 300, clientState);
+
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: `${process.env.SERVER_URL ?? "http://localhost:3001"}/api/v1/auth/google/callback`,
     response_type: "code",
     scope: "openid email profile",
-    state,
+    state: nonce,
   });
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 }
@@ -114,9 +127,14 @@ export async function googleCallback(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { code, state } = req.query as { code: string; state: string };
+    const { code, state: nonce } = req.query as { code: string; state: string };
 
     if (!code) throw new AppError("No code received from Google", 400);
+    if (!nonce) throw new AppError("Missing state parameter (CSRF)", 400);
+
+    const clientState = await redis.get(`oauth:state:${nonce}`);
+    if (clientState === null) throw new AppError("Invalid or expired state parameter (CSRF)", 400);
+    await redis.del(`oauth:state:${nonce}`);
 
     // Exchange code for tokens
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -152,7 +170,7 @@ export async function googleCallback(
 
     const params = new URLSearchParams({
       token: result.accessToken,
-      state: state ?? "",
+      state: clientState ?? "",
     });
 
     res.redirect(`${WEB_URL}/auth/callback?${params}`);

@@ -14,6 +14,22 @@ const activeContainers = new Map<string, {
   timer: NodeJS.Timeout;
 }>();
 
+export async function initContainerManager() {
+  try {
+    const isAvailable = await isDockerAvailable();
+    if (!isAvailable) return;
+
+    const { stdout } = await execAsync(`docker ps -a -q --filter name=${CONTAINER_PREFIX}`);
+    const containerIds = stdout.trim().split("\n").filter(Boolean);
+    if (containerIds.length > 0) {
+      console.log(`[Docker] Cleaning up ${containerIds.length} orphaned containers...`);
+      await execAsync(`docker rm -f ${containerIds.join(" ")}`);
+    }
+  } catch (err) {
+    console.error(`[Docker] Cleanup failed:`, err);
+  }
+}
+
 export async function getOrCreateContainer(
   sessionId: string,
   cwd: string

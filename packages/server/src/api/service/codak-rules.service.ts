@@ -1,4 +1,4 @@
-import { readFile } from "fs/promises";
+import { readFile, stat } from "fs/promises";
 import { resolve } from "path";
 import { redis } from "../infra";
 
@@ -28,11 +28,11 @@ export async function loadCodakRules(cwd: string): Promise<string | null> {
   const filePath = resolve(cwd, CODAK_MD_FILENAME);
 
   try {
-    const stat = await import("fs/promises").then((m) => m.stat(filePath));
+    const fileStat = await stat(filePath);
 
-    if (stat.size > MAX_FILE_SIZE) {
+    if (fileStat.size > MAX_FILE_SIZE) {
       console.warn(
-        `[codak.md] File too large (${(stat.size / 1024).toFixed(1)}KB > 10KB limit) — skipping`
+        `[codak.md] File too large (${(fileStat.size / 1024).toFixed(1)}KB > 10KB limit) — skipping`
       );
       await redis.setex(key, CACHE_TTL, "");
       return null;

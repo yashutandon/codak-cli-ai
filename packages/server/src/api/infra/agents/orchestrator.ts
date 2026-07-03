@@ -15,7 +15,7 @@ export type OrchestratorResult = {
 
 const COMPLEXITY_THRESHOLD = 5;
 
-function detectComplexity(message: string): boolean {
+export function detectComplexity(message: string): boolean {
   const complexKeywords = /build|implement|create|add|setup|integrate|refactor|migrate|scaffold/i;
   const wordCount = message.trim().split(/\s+/).length;
   return complexKeywords.test(message) && wordCount >= COMPLEXITY_THRESHOLD;

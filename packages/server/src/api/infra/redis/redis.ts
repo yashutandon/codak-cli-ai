@@ -8,10 +8,20 @@ if (!REDIS_URL) {
 
 /**
  * Shared Redis client.
- * Use for caching, rate limiting, etc.
+ * Use for caching, rate limiting, pub/sub, and storing indexing status.
  */
 export const redis = new Redis(REDIS_URL, {
   maxRetriesPerRequest: 3,
+  enableReadyCheck: false,
+  tls: REDIS_URL.startsWith("rediss://") ? {} : undefined,
+});
+
+/**
+ * Separate Redis connection for BullMQ.
+ * BullMQ REQUIRES maxRetriesPerRequest: null — otherwise workers crash silently.
+ */
+export const bullmqRedis = new Redis(REDIS_URL, {
+  maxRetriesPerRequest: null, // BullMQ mandatory setting
   enableReadyCheck: false,
   tls: REDIS_URL.startsWith("rediss://") ? {} : undefined,
 });
@@ -22,4 +32,12 @@ redis.on("error", (err) => {
 
 redis.on("connect", () => {
   console.log("✅ Redis connected");
+});
+
+bullmqRedis.on("error", (err) => {
+  console.error("❌ BullMQ Redis error:", err.message);
+});
+
+bullmqRedis.on("connect", () => {
+  console.log("✅ BullMQ Redis connected");
 });

@@ -24,6 +24,7 @@ export async function register(data: RegisterDto): Promise<AuthResponseDto> {
       email: data.email,
       name: data.name ?? null,
       password: hashedPassword,
+      isOAuthUser: false,
     },
     select: { id: true, email: true, name: true },
   });
@@ -36,11 +37,21 @@ export async function register(data: RegisterDto): Promise<AuthResponseDto> {
 export async function login(data: LoginDto): Promise<AuthResponseDto> {
   const user = await db.user.findUnique({
     where: { email: data.email },
-    select: { id: true, email: true, name: true, password: true },
+    select: { id: true, email: true, name: true, password: true, isOAuthUser: true },
   });
 
+  // Use the same error message for user-not-found and wrong-password
+  // to prevent user enumeration attacks
   if (!user) {
     throw new AppError("Invalid email or password", 401);
+  }
+
+  // Block OAuth users from using password login
+  if (user.isOAuthUser || !user.password) {
+    throw new AppError(
+      "This account uses OAuth (GitHub/Google). Please sign in with that provider.",
+      401
+    );
   }
 
   const isValid = await bcrypt.compare(data.password, user.password);

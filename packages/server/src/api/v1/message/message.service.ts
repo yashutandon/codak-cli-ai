@@ -12,6 +12,7 @@ import { getModel } from "../../model/get-model";
 import { runMultiAgent, runPlanner } from "../../service/planner.service";
 import { updateProjectMemory, buildMemoryContext } from "../../service/project-memory";
 import { loadCodakRules, invalidateCodakRulesCache } from "../../service/codak-rules.service";
+import { detectComplexity } from "../../infra/agents/orchestrator";
 
 const SESSION_CACHE_TTL = 60 * 5;
 
@@ -85,7 +86,7 @@ export async function sendMessage(
   const session = await db.session.findFirst({
     where: { id: sessionId, userId },
     include: {
-      messages: { orderBy: { createdAt: "asc" }, take: 10 },
+      messages: { orderBy: { createdAt: "asc" }, take: 50 },
     },
   });
 
@@ -124,7 +125,7 @@ export async function sendMessage(
 
   // RAG retrieval
   let ragContext = "";
-  if (getIndexingStatus(sessionId) === "done") {
+  if (await getIndexingStatus(sessionId) === "done") {
     try {
       ragContext = await retrieveRelevantChunks(sessionId, data.content);
     } catch (err) {
@@ -162,9 +163,8 @@ export async function sendMessage(
   }
 
   // ─── BUILD mode — complex task (multi-agent) ───────────────────
-  const isComplex =
-    /build|implement|create|add|setup|integrate|refactor|migrate|scaffold/i.test(data.content) &&
-    data.content.trim().split(/\s+/).length >= 5;
+  // Delegate to single source of truth for complexity detection
+  const isComplex = detectComplexity(data.content);
 
   if (isComplex) {
     const result = await runMultiAgent(data.content, cwd, fullContext, data.model, history);

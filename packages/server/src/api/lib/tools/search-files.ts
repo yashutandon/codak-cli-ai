@@ -1,34 +1,7 @@
-import { readdir, stat } from "fs/promises";
-import { resolve, join, relative } from "path";
+import fg from "fast-glob";
+import { resolve } from "path";
 
-const IGNORE_DIRS = new Set([".git", "node_modules", ".next", "dist", "build"]);
-
-async function glob(
-  pattern: string,
-  basePath: string,
-  currentPath: string,
-  results: string[]
-): Promise<void> {
-  const entries = await readdir(currentPath, { withFileTypes: true });
-
-  for (const entry of entries) {
-    if (entry.isDirectory() && IGNORE_DIRS.has(entry.name)) continue;
-
-    const fullPath = join(currentPath, entry.name);
-    const relPath = relative(basePath, fullPath);
-
-    if (entry.isDirectory()) {
-      await glob(pattern, basePath, fullPath, results);
-    } else {
-      const regex = new RegExp(
-        "^" + pattern.replace(/\./g, "\\.").replace(/\*/g, ".*").replace(/\?/g, ".") + "$"
-      );
-      if (regex.test(entry.name)) {
-        results.push(relPath);
-      }
-    }
-  }
-}
+const MAX_RESULTS = 1000;
 
 export async function searchFilesTool(
   params: { pattern: string; path?: string },
@@ -36,11 +9,22 @@ export async function searchFilesTool(
 ): Promise<string> {
   const safePath = (params.path ?? ".").replace(/^\/+/, "");
   const searchPath = resolve(cwd, safePath);
-  const results: string[] = [];
 
   try {
-    await glob(params.pattern, searchPath, searchPath, results);
+    const results = await fg(params.pattern, {
+      cwd: searchPath,
+      ignore: ["**/.git/**", "**/node_modules/**", "**/.next/**", "**/dist/**", "**/build/**"],
+      dot: true,
+      onlyFiles: true,
+    });
+
     if (results.length === 0) return `No files found matching: ${params.pattern}`;
+    
+    if (results.length > MAX_RESULTS) {
+      return `Found ${results.length} files. Showing first ${MAX_RESULTS}:\n\n` + 
+             results.slice(0, MAX_RESULTS).join("\n");
+    }
+    
     return results.join("\n");
   } catch (err: any) {
     throw new Error(`Search failed: ${err.message}`);

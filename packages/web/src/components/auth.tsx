@@ -24,8 +24,12 @@ export default function LoginPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    const updateSize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
+    updateSize();
+    window.addEventListener("resize", updateSize);
 
     const dots: { x: number; y: number; vx: number; vy: number; r: number }[] = [];
     for (let i = 0; i < 60; i++) {
@@ -69,7 +73,10 @@ export default function LoginPage() {
       raf = requestAnimationFrame(draw);
     };
     draw();
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      window.removeEventListener("resize", updateSize);
+      cancelAnimationFrame(raf);
+    };
   }, []);
 
   const handleEmailAuth = async () => {
@@ -121,19 +128,14 @@ export default function LoginPage() {
   };
 
  const redirectToCLI = (token: string) => {
-  console.log("state:", state);
-  console.log("token:", token);
   if (!state) {
     toast.error("No CLI state found. Please try again from the CLI.");
     return;
   }
   try {
-    console.log("decoded:", atob(state));
     const payload = JSON.parse(atob(state));
-    console.log("payload:", payload);
     const port = payload.port;
     if (!port) throw new Error("Invalid port");
-    console.log("redirecting to port:", port);
     window.location.href = `http://localhost:${port}/callback?token=${encodeURIComponent(token)}&state=${encodeURIComponent(state)}`;
   } catch (e) {
     console.error("redirect error:", e);

@@ -18,7 +18,7 @@ await ensureAuthenticated();
 const router = createMemoryRouter([
   {
     path: "/",
-    element: <RootLayout />,
+    element: <RootLayout/>,
     children: [
       {
         index: true,

@@ -27,7 +27,7 @@ export type Role = z.infer<typeof RoleSchema>;
 export type Mode = z.infer<typeof ModeSchema>;
 export type MessageStatus = z.infer<typeof MessageStatusSchema>;
 
-export interface Mesage {
+export interface Message {
   id: string;
   role: Role;
   title: string;
@@ -47,7 +47,7 @@ export interface SessionDto {
   cwd: string | null;
   userId: string;
   createdAt: Date;
-  messages: Mesage[];
+  messages: Message[];
 }
 
 export interface GetSessionParamsDto {

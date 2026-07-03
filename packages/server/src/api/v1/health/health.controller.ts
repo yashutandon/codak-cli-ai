@@ -1,12 +1,8 @@
 import { type Request, type Response } from "express";
-import { healthService } from "./health.service";
+import { getHealth } from "./health.service";
 
-class HealthController {
-  getHealth = async (_req: Request, res: Response) => {
-    const result = healthService.getHealth();
-
-    return res.status(200).json(result);
-  };
+export async function healthHandler(_req: Request, res: Response): Promise<void> {
+  const result = await getHealth();
+  const statusCode = result.status === "healthy" ? 200 : result.status === "degraded" ? 200 : 503;
+  res.status(statusCode).json(result);
 }
-
-export const healthController = new HealthController();

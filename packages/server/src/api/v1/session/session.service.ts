@@ -1,13 +1,13 @@
 import { db } from "@codak/database";
 import { indexCodebase } from "../../infra/embeddings";
-import type { CreateSessionDto, SessionDto, Mesage } from "./session.dto";
+import type { CreateSessionDto, SessionDto, Message } from "./session.dto";
 import { AppError } from "../../../utils/AppError";
 
 export async function getAllSessions(userId: string): Promise<SessionDto[]> {
   const sessions = await db.session.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
-    include: { messages: true },
+    include: { messages: { orderBy: { createdAt: "desc" }, take: 1 } },
   });
 
   return sessions.map(toSessionDto);
@@ -53,8 +53,8 @@ export async function createSession(
   });
 
   if (session.cwd) {
-    indexCodebase(session.id, session.cwd).catch((err) =>
-      console.error("[RAG] Background indexing failed:", err)
+    await indexCodebase(session.id, session.cwd).catch((err) =>
+      console.error("[RAG] Failed to enqueue indexing job:", err)
     );
   }
 
@@ -79,8 +79,8 @@ export async function updateSessionCwd(
   });
 
   // Reindex on path change
-  indexCodebase(updated.id, cwd).catch((err) =>
-    console.error("[RAG] Reindex on cwd change failed:", err)
+  await indexCodebase(updated.id, cwd).catch((err) =>
+    console.error("[RAG] Failed to enqueue reindex job:", err)
   );
 
   return toSessionDto(updated);
@@ -94,7 +94,7 @@ function toSessionDto(session: any): SessionDto {
     userId: session.userId,
     createdAt: session.createdAt,
     messages: session.messages.map(
-      (m: any): Mesage => ({
+      (m: any): Message => ({
         id: m.id,
         role: m.role,
         title: m.title,

@@ -25,7 +25,7 @@ export async function executeTool(
   cwd: string,
   sessionId?: string
 ): Promise<string> {
-  const check = validateToolCall(name, args);
+  const check = validateToolCall(name, args, cwd);
   if (!check.allowed) {
     throw new Error(`[Firewall] Tool blocked — ${check.reason}`);
   }
@@ -82,11 +82,11 @@ export async function executeTool(
     });
   }
 
-  if (sessionId && (name === "write_file" || name === "edit_file")) {
+  if (sessionId && (name === "write_file" || name === "edit_file" || name === "delete_file")) {
     const filePath = String(args.path ?? "");
     if (filePath) {
-      triggerReindex(sessionId, filePath, cwd).catch((err) =>
-        console.error("[RAG] Reindex failed:", err)
+      await triggerReindex(sessionId, filePath, cwd).catch((err) =>
+        console.error("[RAG] Reindex enqueue failed:", err)
       );
     }
   }

@@ -54,13 +54,14 @@ model CodeChunk {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  name      String?
-  password  String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  sessions  Session[]
+  id          String    @id @default(cuid())
+  email       String    @unique
+  name        String?
+  password    String?   // null for OAuth users
+  isOAuthUser Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  sessions    Session[]
 
   @@index([email])
 }

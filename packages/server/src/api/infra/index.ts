@@ -1,1 +1,1 @@
-export { redis } from "./redis/redis";
+export { redis, bullmqRedis } from "./redis/redis";
