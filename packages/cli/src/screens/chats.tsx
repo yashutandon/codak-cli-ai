@@ -6,10 +6,12 @@ import { UserMessage } from "../components/messages/user-message";
 import { BotMessage } from "../components/messages/bot-message";
 import { ErrorMessage } from "../components/messages/error-message";
 import { getSessionById } from "../clients/create-session/session.api";
-import { sendMessage, type ToolCall, type ToolResult } from "../clients/message/message.api";
+import { sendMessage, type ToolCall, type ToolResult, type ApprovalRequest, sendApproval } from "../clients/message/message.api";
 import type { Session, Message } from "../clients/create-session/session.types";
 import { DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@codak/shared";
 import type { ToolCallWithResult } from "../components/messages/bot-message";
+import { ToolApprovalPrompt } from "../components/tool-approval-prompt";
+import { parseImagesFromText } from "../utils/image-parser";
 
 const sessionLocationSchema = z.object({
   session: z.custom<Session>(
@@ -48,6 +50,7 @@ export function Chat() {
   const [model, setModel] = useState<SupportedChatModelId>(
     (prefetched?.model as SupportedChatModelId) ?? DEFAULT_CHAT_MODEL_ID
   );
+  const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null);
 
   const autoTriggeredRef = useRef(false);
 
@@ -57,6 +60,7 @@ export function Chat() {
     setStreamingTurn(null);
     setIsStreaming(false);
     setError(null);
+    setPendingApproval(null);
     setModel((prefetched?.model as SupportedChatModelId) ?? DEFAULT_CHAT_MODEL_ID);
     autoTriggeredRef.current = false;
   }, [id]);
@@ -87,6 +91,7 @@ export function Chat() {
   const streamAiResponse = useCallback(async (
     sessionId: string,
     content: string,
+    images: string[] | undefined,
     currentMode: Mode,
     currentModel: SupportedChatModelId
   ) => {
@@ -100,6 +105,7 @@ export function Chat() {
     await sendMessage(
       sessionId,
       content,
+      images,
       currentModel,
       currentMode,
       (chunk) => {
@@ -131,8 +137,21 @@ export function Chat() {
           };
         });
       },
-      () => {
+      (usage?: { promptTokens: number; completionTokens: number }) => {
         const durationMs = Date.now() - startedAt;
+        
+        let tokenUsage = undefined;
+        if (usage) {
+           const totalTokens = usage.promptTokens + usage.completionTokens;
+           let costUsd = 0;
+           if (currentModel.includes("gpt-4o")) {
+             costUsd = (usage.promptTokens * 5.0 / 1000000) + (usage.completionTokens * 15.0 / 1000000);
+           } else if (currentModel.includes("claude-3-5")) {
+             costUsd = (usage.promptTokens * 3.0 / 1000000) + (usage.completionTokens * 15.0 / 1000000);
+           }
+           tokenUsage = { ...usage, totalTokens, costUsd };
+        }
+
         setMessages((prev) => [
           ...prev,
           {
@@ -141,7 +160,7 @@ export function Chat() {
             content: accText,
             title: "",
             status: "COMPLETE",
-            part: null,
+            part: tokenUsage,
             mode: currentMode,
             model: currentModel,
             duration: null,
@@ -157,16 +176,23 @@ export function Chat() {
         setError(err);
         setStreamingTurn(null);
         setIsStreaming(false);
+      },
+      // Approval handler
+      (request: ApprovalRequest) => {
+        setPendingApproval(request);
       }
     );
   }, []);
 
   const handleSubmit = useCallback(async (text: string) => {
     if (!session || isStreaming) return;
+
+    const { processedText, images } = parseImagesFromText(text);
+
     const userMsg: MessageWithDuration = {
       id: crypto.randomUUID(),
       role: "USER",
-      content: text,
+      content: processedText || (images.length > 0 ? "Attached Image(s)" : text),
       title: "",
       status: "COMPLETE",
       part: null,
@@ -177,7 +203,7 @@ export function Chat() {
       sessionId: session.id,
     };
     setMessages((prev) => [...prev, userMsg]);
-    await streamAiResponse(session.id, text, mode, model);
+    await streamAiResponse(session.id, processedText, images.length > 0 ? images : undefined, mode, model);
   }, [session, isStreaming, streamAiResponse, mode, model]);
 
   useEffect(() => {
@@ -187,7 +213,7 @@ export function Chat() {
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "USER") return;
     autoTriggeredRef.current = true;
-    streamAiResponse(session.id, lastMsg.content, mode, model);
+    streamAiResponse(session.id, lastMsg.content, undefined, mode, model);
   }, [session, messages, isStreaming, streamAiResponse, mode, model]);
 
   if (!session) {
@@ -216,6 +242,11 @@ export function Chat() {
             model={msg.model}
             mode={msg.mode as Mode}
             durationMs={(msg as MessageWithDuration).durationMs}
+            tokenUsage={
+              msg.part && typeof msg.part === "object" && "totalTokens" in (msg.part as object)
+                ? (msg.part as { promptTokens: number; completionTokens: number; totalTokens: number; costUsd?: number })
+                : undefined
+            }
           />
         )
       )}
@@ -229,6 +260,22 @@ export function Chat() {
         />
       )}
       {error && <ErrorMessage message={error} />}
+      {pendingApproval && session && (
+        <ToolApprovalPrompt
+          toolName={pendingApproval.toolName}
+          args={pendingApproval.args}
+          onApprove={() => {
+            const req = pendingApproval;
+            setPendingApproval(null);
+            sendApproval(session.id, req.toolCallId, true).catch(console.error);
+          }}
+          onReject={() => {
+            const req = pendingApproval;
+            setPendingApproval(null);
+            sendApproval(session.id, req.toolCallId, false).catch(console.error);
+          }}
+        />
+      )}
     </ChatShell>
   );
 }

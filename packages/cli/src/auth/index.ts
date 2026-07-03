@@ -1,6 +1,6 @@
 import { exec } from "child_process";
 import { platform } from "os";
-import { getToken, saveToken, clearToken } from "./token-store";
+import { getToken, saveToken, clearToken, isAccessTokenExpired } from "./token-store";
 import { waitForToken, getRandomPort } from "./auth-server";
 
 const WEB_URL = process.env.CODAK_WEB_URL ?? "http://localhost:3000";
@@ -23,23 +23,19 @@ function buildState(port: number): string {
 
 export async function ensureAuthenticated(): Promise<string> {
   const existing = await getToken();
-  if (existing) return existing;
+  // Token exists and not expired — return immediately
+  if (existing && !(await isAccessTokenExpired())) return existing;
 
   const port = getRandomPort();
   const state = buildState(port);
   const loginUrl = `${WEB_URL}/?state=${encodeURIComponent(state)}`;
 
-  console.log("Auth port:", port);
-  console.log("State:", state);
-  console.log("Login URL:", loginUrl);
-
   openBrowser(loginUrl);
 
-  const token = await waitForToken(port);
-  
-  await saveToken(token, "");
+  const { accessToken, refreshToken } = await waitForToken(port);
+  await saveToken(accessToken, refreshToken, "");
 
-  return token;
+  return accessToken;
 }
 
 export { getToken, clearToken };

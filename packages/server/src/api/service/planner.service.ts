@@ -7,8 +7,18 @@ export async function runPlanner(
   cwd: string,
   ragContext: string,
   modelId: string,
-  history: { role: "user" | "assistant"; content: string }[]
+  history: { role: "user" | "assistant"; content: string }[],
+  images?: string[]
 ): Promise<string> {
+  const currentUserMessage = images?.length
+    ? {
+        role: "user" as const,
+        content: [
+          { type: "text" as const, text: userMessage },
+          ...images.map((img) => ({ type: "image" as const, image: img })),
+        ],
+      }
+    : { role: "user" as const, content: userMessage };
   const { text } = await generateText({
     model: getModel(modelId),
     system: `You are Codak's planning engine. You analyze codebases and create precise, actionable plans.
@@ -44,7 +54,7 @@ RULES:
 - Be specific — "create src/middleware/auth.ts with JWT validation" not "add auth"
 - Reference actual file paths based on codebase context
 - Order steps by dependency`,
-    messages: [...history, { role: "user" as const, content: userMessage }],
+    messages: [...history, currentUserMessage],
   });
 
   return text;
@@ -55,8 +65,18 @@ export async function runMultiAgent(
   cwd: string,
   ragContext: string,
   modelId: string,
-  history: { role: "user" | "assistant"; content: string }[]
+  history: { role: "user" | "assistant"; content: string }[],
+  images?: string[]
 ): Promise<string> {
+  const currentUserMessage = images?.length
+    ? {
+        role: "user" as const,
+        content: [
+          { type: "text" as const, text: userMessage },
+          ...images.map((img) => ({ type: "image" as const, image: img })),
+        ],
+      }
+    : { role: "user" as const, content: userMessage };
   // Step 1: Orchestrator — task breakdown
   const orchestration = await runOrchestrator(
     userMessage, cwd, ragContext, modelId
@@ -67,7 +87,7 @@ export async function runMultiAgent(
     const { text } = await generateText({
       model: getModel(modelId),
       system: `You are Codak, an AI coding assistant.\nWorking directory: ${cwd}\n${ragContext}`,
-      messages: [...history, { role: "user" as const, content: userMessage }],
+      messages: [...history, currentUserMessage],
     });
     return text;
   }

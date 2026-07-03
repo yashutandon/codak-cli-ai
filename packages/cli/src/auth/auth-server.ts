@@ -1,6 +1,11 @@
 import { createServer } from "http";
 
-export function waitForToken(port: number): Promise<string> {
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export function waitForToken(port: number): Promise<AuthTokens> {
   return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
       const url = new URL(req.url ?? "/", `http://localhost:${port}`);
@@ -11,9 +16,10 @@ export function waitForToken(port: number): Promise<string> {
         return;
       }
 
-      const token = url.searchParams.get("token");
+      const accessToken = url.searchParams.get("token");
+      const refreshToken = url.searchParams.get("refreshToken");
 
-      if (!token) {
+      if (!accessToken) {
         res.writeHead(400);
         res.end("Missing token");
         reject(new Error("No token received"));
@@ -34,13 +40,13 @@ export function waitForToken(port: number): Promise<string> {
             </style>
           </head>
           <body>
-            <h1> AUTHENTICATED</h1>
+            <h1>✓ AUTHENTICATED</h1>
             <p>You can close this tab and return to the CLI.</p>
           </body>
         </html>
       `);
 
-      resolve(token);
+      resolve({ accessToken, refreshToken: refreshToken ?? "" });
       server.close();
     });
 

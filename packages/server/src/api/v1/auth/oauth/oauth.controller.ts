@@ -95,6 +95,7 @@ export async function githubCallback(
     // Redirect back to web with token
     const params = new URLSearchParams({
       token: result.accessToken,
+      refreshToken: result.refreshToken,
       state: clientState ?? "",
     });
 
@@ -170,6 +171,7 @@ export async function googleCallback(
 
     const params = new URLSearchParams({
       token: result.accessToken,
+      refreshToken: result.refreshToken,
       state: clientState ?? "",
     });
 

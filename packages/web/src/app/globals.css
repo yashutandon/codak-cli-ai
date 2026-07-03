@@ -1,2 +1,65 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #ffffff; /* White as primary accent */
+  --color-primary-foreground: #000000;
+  --color-background: #000000; /* Pure black for modern tech look */
+  --color-foreground: #ededed;
+  --color-surface: #0a0a0a; /* Vercel-like very dark gray */
+  --color-surface-hover: #171717;
+  --color-border: #27272a; /* Zinc 800 */
+  --color-muted: #a1a1aa; /* Zinc 400 */
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 93%;
+    --primary: 0 0% 100%;
+  }
+  
+  body {
+    @apply bg-[var(--color-background)] text-[var(--color-foreground)] antialiased;
+    font-family: var(--font-geist-sans), sans-serif;
+  }
+
+  /* Custom Scrollbar for sleek aesthetic */
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #080810; 
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #27272a; 
+    border-radius: 6px;
+    border: 3px solid #080810; /* creates padding effect */
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3f3f46; 
+  }
+  
+  /* Firefox */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: #27272a #080810;
+  }
+}
+
+@layer utilities {
+  .pro-card {
+    @apply bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl transition-all duration-300;
+  }
+  
+  .pro-card:hover {
+    @apply bg-[var(--color-surface-hover)] border-zinc-700;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-zinc-200 via-zinc-400 to-zinc-500;
+  }
+}

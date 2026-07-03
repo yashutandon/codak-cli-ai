@@ -11,6 +11,7 @@ export const SendMessageSchema = z.object({
     (id) => !!findSupportedChatModel(id),
     "Unsupported model. Use a valid model ID."
   ),
+  images: z.array(z.string()).optional(), // Array of base64 data URIs
 });
 
 export type SendMessageDto = z.infer<typeof SendMessageSchema>;
