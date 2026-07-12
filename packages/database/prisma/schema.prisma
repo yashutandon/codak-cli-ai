@@ -50,7 +50,7 @@ model CodeChunk {
   sessionId String
   filePath  String
   content   String
-  embedding Unsupported("vector(3072)")?
+  embedding Unsupported("vector(1024)")?
   startLine Int
   endLine   Int
   createdAt DateTime                    @default(now())
@@ -79,7 +79,8 @@ model User {
 
 model RefreshToken {
   id        String    @id @default(cuid())
-  tokenHash String    @unique  // bcrypt hash of the raw token
+  selector  String    @unique @default(uuid()) // first UUID segment — used for fast O(1) lookup
+  tokenHash String    @unique  // bcrypt hash of the raw token (verified after lookup)
   userId    String
   expiresAt DateTime
   revokedAt DateTime?           // null = active
@@ -87,7 +88,7 @@ model RefreshToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([tokenHash])
+  @@index([selector])
 }
 
 model Session {

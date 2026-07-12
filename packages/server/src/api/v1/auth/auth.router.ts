@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
-import { registerHandler, loginHandler, refreshHandler, logoutHandler } from "./auth.controller";
+import { registerHandler, loginHandler, refreshHandler, logoutHandler, exchangeOAuthCodeHandler } from "./auth.controller";
 import {
   githubInit,
   githubCallback,
@@ -49,10 +49,11 @@ const oauthLimiter = rateLimit({
 });
 
 // ─── Email/Password Routes ─────────────────────────────────────
-authRouter.post("/register", registerLimiter, registerHandler);
-authRouter.post("/login",    loginLimiter,    loginHandler);
-authRouter.post("/refresh",  refreshLimiter,  refreshHandler);
-authRouter.post("/logout",   logoutHandler);
+authRouter.post("/register",      registerLimiter, registerHandler);
+authRouter.post("/login",         loginLimiter,    loginHandler);
+authRouter.post("/refresh",       refreshLimiter,  refreshHandler);
+authRouter.post("/logout",                         logoutHandler);
+authRouter.post("/exchange-code", refreshLimiter,  exchangeOAuthCodeHandler);
 
 // ─── GitHub OAuth ──────────────────────────────────────────────
 authRouter.get("/github",          oauthLimiter, githubInit);

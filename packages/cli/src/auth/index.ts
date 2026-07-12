@@ -28,7 +28,7 @@ export async function ensureAuthenticated(): Promise<string> {
 
   const port = getRandomPort();
   const state = buildState(port);
-  const loginUrl = `${WEB_URL}/?state=${encodeURIComponent(state)}`;
+  const loginUrl = `${WEB_URL}/login?state=${encodeURIComponent(state)}`;
 
   openBrowser(loginUrl);
 

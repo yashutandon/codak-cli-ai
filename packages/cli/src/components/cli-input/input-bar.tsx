@@ -4,7 +4,7 @@ import { TextAttributes, type InputRenderable, type KeyBinding } from "@opentui/
 import { useNavigate } from "react-router"
 
 import { StatusBar, type StatusBarProps } from "./status-bar"
-import { EmptyBorder } from "../common/border"
+import { EmptyBorder, RoundedBorder } from "../common/border"
 import { CommandMenu } from "../command-menu"
 
 import type { TextareaRenderable, ContentChangeEvent } from "@opentui/core"
@@ -217,19 +217,15 @@ const handleCommand = useCallback((command: Command | undefined) => {
 
     return (
         <box
-            border={["left"]}
-            customBorderChars={{
-                ...EmptyBorder,
-                vertical: "│",
-                bottomLeft: "╰",
-            }}
+            border={["top", "bottom", "left", "right"]}
+            customBorderChars={RoundedBorder}
             flexDirection="row"
             alignItems="center"
             width="100%"
             flexShrink={0}
             borderColor={borderColor}
             backgroundColor={colors.surface}
-            minHeight={5}
+            minHeight={3}
         >
             <StatusBar {...statusBar} />
 
@@ -238,6 +234,8 @@ const handleCommand = useCallback((command: Command | undefined) => {
                 flexGrow={1}
                 paddingLeft={1}
                 paddingRight={1}
+                paddingTop={1}
+                paddingBottom={1}
             >
                 <box
                     flexDirection="row"

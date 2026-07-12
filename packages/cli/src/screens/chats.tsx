@@ -160,7 +160,7 @@ export function Chat() {
             content: accText,
             title: "",
             status: "COMPLETE",
-            part: tokenUsage,
+            part: tokenUsage as any,
             mode: currentMode,
             model: currentModel,
             duration: null,

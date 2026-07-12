@@ -1,4 +1,5 @@
 import { Queue } from "bullmq";
+import { createRedisConnection } from "../redis/redis";
 
 export interface IndexCodebaseJobData {
   type: "full";
@@ -18,27 +19,12 @@ export type EmbeddingJobName = "indexCodebase" | "reindexFile";
 
 export const EMBEDDING_QUEUE_NAME = "embedding";
 
-const REDIS_URL = process.env.REDIS_URL!;
-
-function getRedisConnectionOptions() {
-  const url = new URL(REDIS_URL);
-  return {
-    host: url.hostname,
-    port: Number(url.port) || 6379,
-    password: url.password || undefined,
-    tls: REDIS_URL.startsWith("rediss://") ? {} : undefined,
-    maxRetriesPerRequest: null as null, // BullMQ mandatory
-    enableReadyCheck: false,
-  };
-}
-
-
 /**
  * BullMQ Queue for embedding jobs.
  * Jobs are processed by the worker in src/worker.ts.
  */
 export const embeddingQueue = new Queue<EmbeddingJobData, void, EmbeddingJobName>(EMBEDDING_QUEUE_NAME, {
-  connection: getRedisConnectionOptions(),
+  connection: createRedisConnection(),
   defaultJobOptions: {
     attempts: 3,
     backoff: {

@@ -41,3 +41,21 @@ bullmqRedis.on("error", (err) => {
 bullmqRedis.on("connect", () => {
   console.log("✅ BullMQ Redis connected");
 });
+
+/**
+ * Returns an ioredis connection options object for BullMQ workers.
+ * BullMQ requires maxRetriesPerRequest: null — do NOT pass the shared redis instance.
+ *
+ * Used by: infra/bullmq/message.queue.ts, infra/bullmq/message.worker.ts
+ */
+export function createRedisConnection() {
+  const url = new URL(REDIS_URL);
+  return {
+    host: url.hostname,
+    port: Number(url.port) || 6379,
+    password: url.password || undefined,
+    tls: REDIS_URL.startsWith("rediss://") ? {} : undefined,
+    maxRetriesPerRequest: null as null,
+    enableReadyCheck: false,
+  };
+}

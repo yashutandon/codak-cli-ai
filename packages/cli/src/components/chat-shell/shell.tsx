@@ -4,6 +4,7 @@ import { useKeyboard } from "@opentui/react"
 import type { ReactNode } from "react"
 import { InputBar } from "../cli-input/input-bar"
 import { Spinner } from "../common/spinner"
+import { RoundedBorder } from "../common/border"
 import { DEFAULT_CHAT_MODEL_ID, type SupportedChatModelId } from "@codak/shared"
 import { useTheme } from "../../providers/theme"
 import { ModelPickerOverlay } from "../model-picker-overlay"
@@ -51,12 +52,14 @@ export function ChatShell({
       flexGrow={1}
       width="100%"
       height="100%"
-      paddingY={1}
-      paddingX={2}
-      gap={1}
+      paddingY={0}
+      paddingX={1}
+      border={["top", "bottom", "left", "right"]}
+      customBorderChars={RoundedBorder}
+      borderColor={colors.dimSeparator}
     >
       <scrollbox flexGrow={1} width="100%" stickyScroll stickyStart="bottom">
-        <box gap={1} paddingBottom={1}>{children}</box>
+        <box gap={1} paddingBottom={1} paddingX={1}>{children}</box>
       </scrollbox>
 
       {/* Ctrl+M model picker overlay */}
@@ -70,7 +73,7 @@ export function ChatShell({
         </box>
       )}
 
-      <box flexShrink={0}>
+      <box flexShrink={0} paddingX={1}>
         <InputBar
           onSubmit={onSubmit}
           disabled={inputDisabled}
@@ -91,8 +94,8 @@ export function ChatShell({
         alignItems="center"
         width="100%"
         height={1}
-        gap={2}
-        paddingLeft={1}
+        paddingX={1}
+        marginTop={1}
       >
         <box flexDirection="row" alignItems="center" gap={2} minWidth={2}>
           {loading ? <Spinner /> : <text fg={colors.dimSeparator}>{" "}</text>}

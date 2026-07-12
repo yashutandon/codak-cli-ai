@@ -9,31 +9,14 @@ import { scanFiles } from "../embeddings/scanner.service";
 import { setIndexingStatus } from "../embeddings/indexer.service";
 import type { EmbeddingJobData, EmbeddingJobName } from "./embedding.queue";
 import { EMBEDDING_QUEUE_NAME } from "./embedding.queue";
-
-const REDIS_URL = process.env.REDIS_URL!;
-
-function getRedisConnectionOptions() {
-  const url = new URL(REDIS_URL);
-  return {
-    host: url.hostname,
-    port: Number(url.port) || 6379,
-    password: url.password || undefined,
-    tls: REDIS_URL.startsWith("rediss://") ? {} : undefined,
-    maxRetriesPerRequest: null as null, // BullMQ mandatory
-    enableReadyCheck: false,
-  };
-}
-
-function isRateLimitError(err: any): boolean {
-  return (
-    err?.errors?.[0]?.statusCode === 429 ||
-    err?.lastError?.statusCode === 429 ||
-    err?.statusCode === 429
-  );
-}
+import { createRedisConnection } from "../redis/redis";
 
 /**
  * Process a full codebase indexing job.
+ *
+ * Rate limiting, retries, and provider fallback are handled transparently
+ * by the AIGateway inside getEmbeddingsBatch(). The worker only needs to
+ * handle BullMQ-level job failure (rethrow → BullMQ retries the entire job).
  */
 async function processIndexCodebase(
   sessionId: string,
@@ -43,6 +26,13 @@ async function processIndexCodebase(
   await setIndexingStatus(sessionId, "indexing");
 
   try {
+    const session = await db.session.findUnique({ where: { id: sessionId } });
+    if (!session) {
+      console.warn(`[Worker:indexer] Session not found: ${sessionId}. Aborting indexing.`);
+      await setIndexingStatus(sessionId, "failed");
+      return;
+    }
+
     await db.codeChunk.deleteMany({ where: { sessionId } });
 
     const files = await scanFiles(cwd);
@@ -63,7 +53,7 @@ async function processIndexCodebase(
 
     console.log(`[Worker:indexer] Total chunks: ${allChunks.length}`);
 
-    const { batchSize, delayBetweenBatchesMs, retryDelayMs } = RAG_CONFIG.rateLimit;
+    const { batchSize, delayBetweenBatchesMs } = RAG_CONFIG.rateLimit;
 
     let i = 0;
     while (i < allChunks.length) {
@@ -72,55 +62,44 @@ async function processIndexCodebase(
       const batch = allChunks.slice(i, i + batchSize);
       const texts = batch.map((c) => c.content);
 
-      try {
-        const embeddings = await getEmbeddingsBatch(texts);
+      // AIGateway handles retry (500ms → 1s → 2s) and provider fallback internally.
+      // If it throws here, BullMQ will retry the entire job per queue defaultJobOptions.
+      const embeddings = await getEmbeddingsBatch(texts);
 
-        const insertValues = batch
-          .map((chunk, j) => {
-            const embedding = embeddings[j];
-            if (!chunk || !embedding) return null;
-            return { chunk, embedding };
-          })
-          .filter(Boolean) as { chunk: CodeChunkInput; embedding: number[] }[];
+      const insertValues = batch
+        .map((chunk, j) => {
+          const embedding = embeddings[j];
+          if (!chunk || !embedding) return null;
+          return { chunk, embedding };
+        })
+        .filter(Boolean) as { chunk: CodeChunkInput; embedding: number[] }[];
 
-        for (const { chunk, embedding } of insertValues) {
-          await db.$executeRaw`
-            INSERT INTO "CodeChunk"
-              ("id", "sessionId", "filePath", "content", "embedding", "startLine", "endLine", "createdAt")
-            VALUES (
-              gen_random_uuid()::text,
-              ${sessionId},
-              ${chunk.filePath},
-              ${chunk.content},
-              ${`[${embedding.join(",")}]`}::vector,
-              ${chunk.startLine},
-              ${chunk.endLine},
-              NOW()
-            )
-            ON CONFLICT DO NOTHING
-          `;
-        }
+      for (const { chunk, embedding } of insertValues) {
+        await db.$executeRaw`
+          INSERT INTO "CodeChunk"
+            ("id", "sessionId", "filePath", "content", "embedding", "startLine", "endLine", "createdAt")
+          VALUES (
+            gen_random_uuid()::text,
+            ${sessionId},
+            ${chunk.filePath},
+            ${chunk.content},
+            ${`[${embedding.join(",")}]`}::vector,
+            ${chunk.startLine},
+            ${chunk.endLine},
+            NOW()
+          )
+          ON CONFLICT DO NOTHING
+        `;
+      }
 
-        console.log(
-          `[Worker:indexer] Batch ${Math.floor(i / batchSize) + 1} done (${i + batch.length}/${allChunks.length})`
-        );
+      console.log(
+        `[Worker:indexer] Batch ${Math.floor(i / batchSize) + 1} done (${i + batch.length}/${allChunks.length})`
+      );
 
-        i += batchSize;
+      i += batchSize;
 
-        if (i < allChunks.length) {
-          await sleep(delayBetweenBatchesMs);
-        }
-      } catch (err) {
-        if (isRateLimitError(err)) {
-          console.warn(
-            `[Worker:indexer] Rate limited at chunk ${i} — waiting ${retryDelayMs / 1000}s...`
-          );
-          await sleep(retryDelayMs);
-          // retry same batch
-        } else {
-          console.error(`[Worker:indexer] Batch failed at index ${i}:`, err);
-          i += batchSize;
-        }
+      if (i < allChunks.length) {
+        await sleep(delayBetweenBatchesMs);
       }
     }
 
@@ -129,7 +108,7 @@ async function processIndexCodebase(
   } catch (err) {
     await setIndexingStatus(sessionId, "failed");
     console.error(`[Worker:indexer] Fatal error:`, err);
-    throw err; // BullMQ retry ke liye rethrow
+    throw err; // Rethrow so BullMQ can retry the job
   }
 }
 
@@ -143,6 +122,12 @@ async function processReindexFile(
   signal: AbortSignal
 ): Promise<void> {
   try {
+    const session = await db.session.findUnique({ where: { id: sessionId } });
+    if (!session) {
+      console.warn(`[Worker:reindex] Session not found: ${sessionId}. Aborting.`);
+      return;
+    }
+
     const absolutePath = resolve(cwd, filePath.replace(/^\/+/, ""));
     let content: string;
 
@@ -165,7 +150,7 @@ async function processReindexFile(
     const chunks = chunkFile(content, filePath);
     if (chunks.length === 0) return;
 
-    const { batchSize, delayBetweenBatchesMs, retryDelayMs } = RAG_CONFIG.rateLimit;
+    const { batchSize, delayBetweenBatchesMs } = RAG_CONFIG.rateLimit;
 
     let i = 0;
     while (i < chunks.length) {
@@ -174,42 +159,33 @@ async function processReindexFile(
       const batch = chunks.slice(i, i + batchSize);
       const texts = batch.map((c: CodeChunkInput) => c.content);
 
-      try {
-        const embeddings = await getEmbeddingsBatch(texts);
+      // AIGateway handles retry + fallback — no manual 429 handling needed here.
+      const embeddings = await getEmbeddingsBatch(texts);
 
-        for (let j = 0; j < batch.length; j++) {
-          const chunk = batch[j];
-          const embedding = embeddings[j];
-          if (!chunk || !embedding) continue;
+      for (let j = 0; j < batch.length; j++) {
+        const chunk = batch[j];
+        const embedding = embeddings[j];
+        if (!chunk || !embedding) continue;
 
-          await db.$executeRaw`
-            INSERT INTO "CodeChunk"
-              ("id", "sessionId", "filePath", "content", "embedding", "startLine", "endLine", "createdAt")
-            VALUES (
-              gen_random_uuid()::text,
-              ${sessionId},
-              ${chunk.filePath},
-              ${chunk.content},
-              ${`[${embedding.join(",")}]`}::vector,
-              ${chunk.startLine},
-              ${chunk.endLine},
-              NOW()
-            )
-            ON CONFLICT DO NOTHING
-          `;
-        }
-
-        i += batchSize;
-        if (i < chunks.length) await sleep(delayBetweenBatchesMs);
-      } catch (err) {
-        if (isRateLimitError(err)) {
-          console.warn(`[Worker:reindex] Rate limited — waiting ${retryDelayMs / 1000}s...`);
-          await sleep(retryDelayMs);
-        } else {
-          console.error(`[Worker:reindex] Batch failed:`, err);
-          i += batchSize;
-        }
+        await db.$executeRaw`
+          INSERT INTO "CodeChunk"
+            ("id", "sessionId", "filePath", "content", "embedding", "startLine", "endLine", "createdAt")
+          VALUES (
+            gen_random_uuid()::text,
+            ${sessionId},
+            ${chunk.filePath},
+            ${chunk.content},
+            ${`[${embedding.join(",")}]`}::vector,
+            ${chunk.startLine},
+            ${chunk.endLine},
+            NOW()
+          )
+          ON CONFLICT DO NOTHING
+        `;
       }
+
+      i += batchSize;
+      if (i < chunks.length) await sleep(delayBetweenBatchesMs);
     }
 
     console.log(`[Worker:reindex] Done: ${filePath} (${chunks.length} chunks)`);
@@ -240,7 +216,7 @@ export function createEmbeddingWorker(): Worker<EmbeddingJobData, void, Embeddin
       }
     },
     {
-      connection: getRedisConnectionOptions(),
+      connection: createRedisConnection(),
       concurrency: 2,
       lockDuration: 5 * 60 * 1000, // 5 minutes
     }

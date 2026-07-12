@@ -127,29 +127,31 @@ export default function LoginPage() {
     window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/${provider}?${params}`;
   };
 
- const redirectToCLI = (token: string, refreshToken = "") => {
-  if (!state) {
-    // Web-only login
-    localStorage.setItem("accessToken", token);
-    if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
-    window.location.href = "/";
-    return;
-  }
-  try {
-    const payload = JSON.parse(atob(state));
-    const port = payload.port;
-    if (!port) throw new Error("Invalid port");
-    const params = new URLSearchParams({
-      token,
-      state,
-      ...(refreshToken ? { refreshToken } : {}),
-    });
-    window.location.href = `http://localhost:${port}/callback?${params}`;
-  } catch (e) {
-    console.error("redirect error:", e);
-    toast.error("Invalid auth state. Please try again from the CLI.");
-  }
-};
+  const redirectToCLI = (token: string, refreshToken = "") => {
+    if (!state) {
+      // Web-only login
+      localStorage.setItem("accessToken", token);
+      if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
+      window.location.href = "/";
+      return;
+    }
+    try {
+      let base64 = state.replace(/-/g, "+").replace(/_/g, "/");
+      while (base64.length % 4) base64 += "=";
+      const payload = JSON.parse(atob(base64));
+      const port = payload.port;
+      if (!port) throw new Error("Invalid port");
+      const params = new URLSearchParams({
+        token,
+        state,
+        ...(refreshToken ? { refreshToken } : {}),
+      });
+      window.location.href = `http://localhost:${port}/callback?${params}`;
+    } catch (e) {
+      console.error("redirect error:", e);
+      toast.error("Invalid auth state. Please try again from the CLI.");
+    }
+  };
 
   const handleToggle = () => {
     setIsRegister(!isRegister);
