@@ -164,8 +164,9 @@ export async function sendMessage(
   }
 
   // ─── BUILD mode — complex task (multi-agent) ───────────────────
-  // Delegate to single source of truth for complexity detection
-  const isComplex = detectComplexity(data.content);
+  // TODO: Refactor multi-agent to use tools properly. For now, route all 
+  // queries to the main streamText pipeline so tools can be executed.
+  const isComplex = false; // detectComplexity(data.content);
 
   if (isComplex) {
     const result = await runMultiAgent(data.content, cwd, fullContext, data.model, history, data.images);

@@ -2,8 +2,14 @@ export const RAG_CONFIG = {
   chunkSize: 150,
   chunkOverlap: 20,
   topK: 5,
-  embeddingModel: "gemini-embedding-001",
-  embeddingDimension: 3072,
+  /**
+   * Primary embedding model served by Voyage AI (P1 provider).
+   * Dimension MUST match the PostgreSQL vector column:
+   *   voyage-code-3   → 1024 (current after migration)
+   *   gemini-embedding-001 → 3072 (original, kept as fallback reference)
+   */
+  embeddingModel: "voyage-code-3",
+  embeddingDimension: 1024,
   maxFileSizeBytes: 500 * 1024,
   rateLimit: {
     requestsPerMinute: 15,

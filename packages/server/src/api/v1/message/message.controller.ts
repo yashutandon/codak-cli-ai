@@ -51,9 +51,10 @@ export async function sendMessageHandler(
     }
 
     // BUILD mode — wire SSE controller so executor can push approval events
+    const sessionId = req.params.id;
     const stream = new ReadableStream({
       start(controller) {
-        setActiveStreamController(controller);
+        setActiveStreamController(sessionId, controller);
       },
     });
 
@@ -126,10 +127,10 @@ export async function sendMessageHandler(
       }
     }
 
-    setActiveStreamController(null);
+    setActiveStreamController(req.params.id, null);
     res.end();
   } catch (err) {
-    setActiveStreamController(null);
+    setActiveStreamController(req.params.id, null);
     next(err);
   }
 }

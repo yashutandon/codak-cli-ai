@@ -46,6 +46,10 @@ app.use(
   })
 );
 
+// Webhook route must receive the raw body buffer for HMAC signature verification.
+// This middleware MUST be registered before the global express.json() parser.
+app.use("/api/v1/payment/webhook", express.raw({ type: "application/json" }));
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 

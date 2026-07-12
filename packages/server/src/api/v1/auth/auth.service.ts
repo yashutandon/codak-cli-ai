@@ -19,7 +19,10 @@ function signAccessToken(userId: string): string {
 }
 
 async function createRefreshToken(userId: string): Promise<string> {
-  const rawToken = randomUUID();
+  const rawToken = randomUUID(); // e.g. "550e8400-e29b-41d4-a716-446655440000"
+  // First UUID segment (8 hex chars) used as a selector for O(1) DB lookup.
+  // It is NOT secret — it only identifies the candidate row. The hash verifies authenticity.
+  const selector = rawToken.split("-")[0];
   const tokenHash = await bcrypt.hash(rawToken, 10);
   const expiresAt = new Date(
     Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000
@@ -32,7 +35,7 @@ async function createRefreshToken(userId: string): Promise<string> {
   });
 
   await db.refreshToken.create({
-    data: { tokenHash, userId, expiresAt },
+    data: { selector, tokenHash, userId, expiresAt },
   });
 
   return rawToken;
@@ -102,64 +105,60 @@ export async function login(data: LoginDto): Promise<AuthResponseDto> {
 }
 
 export async function refreshAccessToken(rawToken: string): Promise<AuthResponseDto> {
-  // Find all active tokens for any user and check against hash
-  // We use findMany with revokedAt null and check hash (avoids timing attacks from full table scan)
-  // In practice the token is unique enough UUID so we just hash-check candidates
-  const activeTokens = await db.refreshToken.findMany({
-    where: {
-      revokedAt: null,
-      expiresAt: { gt: new Date() },
-    },
+  // O(1) lookup: extract selector from the token, fetch exactly one candidate row,
+  // then bcrypt-verify only that row. Eliminates the previous O(N) full-table scan.
+  const selector = rawToken.split("-")[0];
+
+  const record = await db.refreshToken.findUnique({
+    where: { selector },
     include: { user: { select: { id: true, email: true, name: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 1000, // safety cap
   });
 
-  let matched: (typeof activeTokens)[0] | null = null;
-  for (const record of activeTokens) {
-    const ok = await bcrypt.compare(rawToken, record.tokenHash);
-    if (ok) {
-      matched = record;
-      break;
-    }
-  }
+  const isExpiredOrRevoked =
+    !record || record.revokedAt !== null || record.expiresAt < new Date();
 
-  if (!matched) {
+  // Always run bcrypt.compare to prevent timing-based enumeration attacks.
+  // If no record found, compare against a dummy hash so timing stays constant.
+  const DUMMY_HASH =
+    "$2a$10$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  const ok = await bcrypt.compare(rawToken, record?.tokenHash ?? DUMMY_HASH);
+
+  if (isExpiredOrRevoked || !ok) {
     throw new AppError("Invalid or expired refresh token", 401);
   }
 
   // Rotate — revoke old, issue new pair
   await db.refreshToken.update({
-    where: { id: matched.id },
+    where: { id: record.id },
     data: { revokedAt: new Date() },
   });
 
-  const accessToken = signAccessToken(matched.userId);
-  const refreshToken = await createRefreshToken(matched.userId);
+  const accessToken = signAccessToken(record.userId);
+  const refreshToken = await createRefreshToken(record.userId);
 
   return {
     accessToken,
     refreshToken,
-    user: { id: matched.user.id, email: matched.user.email, name: matched.user.name },
+    user: { id: record.user.id, email: record.user.email, name: record.user.name },
   };
 }
 
 export async function revokeRefreshToken(rawToken: string): Promise<void> {
-  const activeTokens = await db.refreshToken.findMany({
-    where: { revokedAt: null },
-    take: 1000,
+  const selector = rawToken.split("-")[0];
+
+  const record = await db.refreshToken.findUnique({
+    where: { selector },
   });
 
-  for (const record of activeTokens) {
-    const ok = await bcrypt.compare(rawToken, record.tokenHash);
-    if (ok) {
-      await db.refreshToken.update({
-        where: { id: record.id },
-        data: { revokedAt: new Date() },
-      });
-      return;
-    }
-  }
+  if (!record || record.revokedAt) return; // already revoked or not found
+
+  const ok = await bcrypt.compare(rawToken, record.tokenHash);
+  if (!ok) return; // token doesn't match — do nothing
+
+  await db.refreshToken.update({
+    where: { id: record.id },
+    data: { revokedAt: new Date() },
+  });
 }
 
 // Expose for OAuth service

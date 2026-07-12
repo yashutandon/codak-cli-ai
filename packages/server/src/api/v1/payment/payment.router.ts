@@ -83,19 +83,41 @@ paymentRouter.post("/create-subscription", authenticate, async (req, res) => {
 paymentRouter.post("/webhook", async (req, res) => {
   try {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-    
-    if (secret) {
-      const shasum = crypto.createHmac("sha256", secret);
-      shasum.update(JSON.stringify(req.body));
-      const digest = shasum.digest("hex");
 
-      if (digest !== req.headers["x-razorpay-signature"]) {
+    // req.body is a raw Buffer here (express.raw middleware set in app.ts).
+    // Using original bytes for HMAC — re-serialising via JSON.stringify()
+    // changes key ordering/whitespace and makes valid signatures fail.
+    const rawBody = Buffer.isBuffer(req.body)
+      ? req.body
+      : Buffer.from(JSON.stringify(req.body)); // defensive fallback
+
+    if (secret) {
+      const signature = req.headers["x-razorpay-signature"];
+      if (!signature || typeof signature !== "string") {
+        return res.status(400).json({ success: false, error: { message: "Missing signature" } });
+      }
+
+      const digest = crypto
+        .createHmac("sha256", secret)
+        .update(rawBody)
+        .digest("hex");
+
+      // Constant-time comparison to prevent timing-based attacks
+      const sigBuffer = Buffer.from(signature, "hex");
+      const digBuffer = Buffer.from(digest, "hex");
+      const signatureValid =
+        sigBuffer.length === digBuffer.length &&
+        crypto.timingSafeEqual(sigBuffer, digBuffer);
+
+      if (!signatureValid) {
         return res.status(400).json({ success: false, error: { message: "Invalid signature" } });
       }
     }
 
-    const event = req.body.event;
-    const payload = req.body.payload;
+    // Parse the raw body now that signature is verified
+    const body = JSON.parse(rawBody.toString("utf-8"));
+    const event = body.event;
+    const payload = body.payload;
 
     if (event === "subscription.charged" || event === "subscription.authenticated") {
       const subscription = payload.subscription.entity;

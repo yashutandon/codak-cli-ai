@@ -92,10 +92,18 @@ export async function githubCallback(
       provider: "github",
     });
 
-    // Redirect back to web with token
+    // Store tokens in Redis behind a one-time code (64 hex chars, 2-minute TTL).
+    // The URL only carries this opaque code — never the actual JWT/refresh tokens.
+    // The web frontend calls POST /api/v1/auth/exchange-code to redeem it.
+    const oauthCode = randomBytes(32).toString("hex");
+    await redis.setex(
+      `oauth:code:${oauthCode}`,
+      120, // 2 minutes
+      JSON.stringify({ accessToken: result.accessToken, refreshToken: result.refreshToken })
+    );
+
     const params = new URLSearchParams({
-      token: result.accessToken,
-      refreshToken: result.refreshToken,
+      code: oauthCode,
       state: clientState ?? "",
     });
 
@@ -169,9 +177,16 @@ export async function googleCallback(
       provider: "google",
     });
 
+    // Store tokens in Redis behind a one-time code (64 hex chars, 2-minute TTL).
+    const oauthCode = randomBytes(32).toString("hex");
+    await redis.setex(
+      `oauth:code:${oauthCode}`,
+      120, // 2 minutes
+      JSON.stringify({ accessToken: result.accessToken, refreshToken: result.refreshToken })
+    );
+
     const params = new URLSearchParams({
-      token: result.accessToken,
-      refreshToken: result.refreshToken,
+      code: oauthCode,
       state: clientState ?? "",
     });
 

@@ -34,22 +34,29 @@ const APPROVAL_REQUIRED_TOOLS: Set<ToolName> = new Set([
 ]);
 
 /**
- * SSE stream reference — set by the message controller so the executor
- * can push an approval-request event to the CLI.
+ * Per-session SSE stream controllers.
+ * Using a Map (keyed by sessionId) instead of a global singleton so that
+ * concurrent users never receive each other's approval-request events.
  */
-let activeStreamController: ReadableStreamDefaultController | null = null;
+const streamControllers = new Map<string, ReadableStreamDefaultController>();
 
 export function setActiveStreamController(
+  sessionId: string,
   controller: ReadableStreamDefaultController | null
 ) {
-  activeStreamController = controller;
+  if (controller === null) {
+    streamControllers.delete(sessionId);
+  } else {
+    streamControllers.set(sessionId, controller);
+  }
 }
 
-function pushSSEEvent(data: object) {
-  if (!activeStreamController) return;
+function pushSSEEvent(sessionId: string, data: object) {
+  const controller = streamControllers.get(sessionId);
+  if (!controller) return;
   try {
     const encoder = new TextEncoder();
-    activeStreamController.enqueue(
+    controller.enqueue(
       encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
     );
   } catch {
@@ -72,12 +79,15 @@ export async function executeTool(
   if (APPROVAL_REQUIRED_TOOLS.has(name)) {
     const toolCallId = randomUUID();
 
-    pushSSEEvent({
-      type: "tool-approval-required",
-      toolCallId,
-      toolName: name,
-      args,
-    });
+    // sessionId is required to route the event to the correct user's stream
+    if (sessionId) {
+      pushSSEEvent(sessionId, {
+        type: "tool-approval-required",
+        toolCallId,
+        toolName: name,
+        args,
+      });
+    }
 
     const approved = await waitForApproval(toolCallId);
 

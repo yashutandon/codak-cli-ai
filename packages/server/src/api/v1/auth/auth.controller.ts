@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { register, login, refreshAccessToken, revokeRefreshToken } from "./auth.service";
 import { RegisterSchema, LoginSchema } from "./auth.dto";
 import { AppError } from "../../../utils/AppError";
+import { redis } from "../../infra/redis/redis";
 import { z } from "zod";
 
 const RefreshSchema = z.object({ refreshToken: z.string().min(1) });
@@ -65,6 +66,39 @@ export async function logoutHandler(
       await revokeRefreshToken(parsed.data.refreshToken).catch(() => {});
     }
     res.status(200).json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+const ExchangeCodeSchema = z.object({ code: z.string().min(1) });
+
+/**
+ * POST /auth/exchange-code
+ * Redeems the short-lived one-time OAuth code for actual tokens.
+ * The code is consumed on first use (deleted from Redis), making it single-use.
+ */
+export async function exchangeOAuthCodeHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = ExchangeCodeSchema.safeParse(req.body);
+    if (!parsed.success) return next(new AppError("code is required", 400));
+
+    const key = `oauth:code:${parsed.data.code}`;
+    const raw = await redis.get(key);
+
+    if (!raw) {
+      return next(new AppError("Invalid or expired OAuth code", 400));
+    }
+
+    // Delete immediately — single-use guarantee
+    await redis.del(key);
+
+    const tokens = JSON.parse(raw) as { accessToken: string; refreshToken: string };
+    res.status(200).json({ success: true, data: tokens });
   } catch (err) {
     next(err);
   }

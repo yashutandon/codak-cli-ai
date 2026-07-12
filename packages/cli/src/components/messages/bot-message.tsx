@@ -2,6 +2,7 @@ import { TextAttributes } from "@opentui/core";
 import { useTheme } from "../../providers/theme";
 import prettyMs from "pretty-ms";
 import type { ToolCall, ToolResult } from "../../clients/message/message.api";
+import { RoundedBorder } from "../common/border";
 
 export type ToolCallWithResult = ToolCall & {
   result?: string;
@@ -64,10 +65,10 @@ function ToolCallItem({ toolCall }: { toolCall: ToolCallWithResult }) {
       flexDirection="column"
       width="100%"
       paddingX={2}
-      paddingLeft={3}
-      borderColor={colors.selection}
+      paddingLeft={1}
     >
       <box flexDirection="row" gap={1} alignItems="center">
+        <text fg={colors.dimSeparator}>{"├─"}</text>
         <text fg={toolCall.pending ? colors.planMode : colors.success}>
           {toolCall.pending ? "◌" : "●"}
         </text>
@@ -82,9 +83,9 @@ function ToolCallItem({ toolCall }: { toolCall: ToolCallWithResult }) {
       </box>
 
       {!toolCall.pending && resultText ? (
-        <box paddingLeft={3}>
+        <box paddingLeft={4}>
           <text fg={colors.dimSeparator} attributes={TextAttributes.DIM}>
-            ↳ {resultText}
+            │  {resultText}
           </text>
         </box>
       ) : null}
@@ -156,10 +157,18 @@ function MarkdownContent({
 
     if (inCodeBlock) {
       elements.push(
-        <box key={key} paddingLeft={1} backgroundColor={colors.surface}>
-          <text fg={colors.success}>
-            {"  " + (line.type === "text" ? line.text : "")}
-          </text>
+        <box key={key} width="100%" paddingLeft={1} paddingRight={1}>
+          <box 
+            backgroundColor={colors.surface} 
+            width="100%" 
+            paddingLeft={1}
+            border={["left"]}
+            borderColor={colors.primary}
+          >
+            <text fg={colors.thinking}>
+              {(line.type === "text" ? line.text : "")}
+            </text>
+          </box>
         </box>
       );
       return;
@@ -172,15 +181,17 @@ function MarkdownContent({
 
     if (line.type === "hr") {
       elements.push(
-        <text key={key} fg={colors.dimSeparator}>{"─────────────────────"}</text>
+        <box key={key} paddingY={1}>
+          <text fg={colors.dimSeparator}>{"────────────────────────────────────────"}</text>
+        </box>
       );
       return;
     }
 
     if (line.type === "h1") {
       elements.push(
-        <box key={key} flexDirection="row" gap={1} alignItems="center">
-          <text fg={mode === "PLAN" ? colors.planMode : colors.primary}>▍</text>
+        <box key={key} flexDirection="row" gap={1} alignItems="center" paddingY={1}>
+          <text fg={mode === "PLAN" ? colors.planMode : colors.primary}>█</text>
           <text fg={mode === "PLAN" ? colors.planMode : colors.primary} attributes={TextAttributes.BOLD}>
             {stripInline(line.text)}
           </text>
@@ -268,12 +279,18 @@ export function BotMessage({
           flexDirection="column"
           width="100%"
           paddingTop={1}
+          paddingBottom={1}
           gap={0}
-          border={["left"]}
-          borderColor={colors.selection}
         >
-          {toolCalls.map((tc) => (
-            <ToolCallItem key={tc.toolCallId} toolCall={tc} />
+          {toolCalls.map((tc, index) => (
+            <box key={tc.toolCallId} flexDirection="column">
+              <ToolCallItem toolCall={tc} />
+              {index === toolCalls.length - 1 && (
+                <box paddingLeft={1}>
+                  <text fg={colors.dimSeparator}>{"└─"}</text>
+                </box>
+              )}
+            </box>
           ))}
         </box>
       )}

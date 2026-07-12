@@ -13,8 +13,20 @@ export const EmptyBorder = {
 }
 
 export const SplitBorder = {
-
     ...EmptyBorder,
     vertical: "┃",
- 
+}
+
+export const RoundedBorder = {
+  topLeft: "╭",
+  topRight: "╮",
+  bottomLeft: "╰",
+  bottomRight: "╯",
+  vertical: "│",
+  horizontal: "─",
+  topT: "┬",
+  bottomT: "┴",
+  leftT: "├",
+  rightT: "┤",
+  cross: "┼",
 }
