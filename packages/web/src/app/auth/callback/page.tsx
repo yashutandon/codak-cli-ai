@@ -6,11 +6,13 @@ import { useSearchParams } from "next/navigation";
 function CallbackHandler() {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [authSuccess, setAuthSuccess] = useState(false);
+  const state = searchParams.get("state");
+  const isCLI = !!state;
 
   useEffect(() => {
     const code = searchParams.get("code");
     const existingToken = searchParams.get("token");
-    const state = searchParams.get("state");
 
     const processAuth = async () => {
       let finalToken = existingToken;
@@ -42,14 +44,15 @@ function CallbackHandler() {
         return;
       }
 
-      if (!state) {
-        // Web-only login
+      if (!isCLI) {
+        // Web-only login -> redirect to dashboard
         localStorage.setItem("accessToken", finalToken);
         if (finalRefreshToken) localStorage.setItem("refreshToken", finalRefreshToken);
-        window.location.href = "/";
+        window.location.href = "/chat";
         return;
       }
 
+      // CLI Login -> Send token to CLI local server via fetch
       try {
         let base64 = state.replace(/-/g, "+").replace(/_/g, "/");
         while (base64.length % 4) base64 += "=";
@@ -57,12 +60,20 @@ function CallbackHandler() {
         const port = payload.port;
         if (!port) throw new Error("Invalid port");
         
-        const redirectUrl = new URL(`http://localhost:${port}/callback`);
-        redirectUrl.searchParams.set("token", finalToken);
-        redirectUrl.searchParams.set("state", state);
-        if (finalRefreshToken) redirectUrl.searchParams.set("refreshToken", finalRefreshToken);
+        const params = new URLSearchParams({
+          token: finalToken,
+          state: state!,
+          ...(finalRefreshToken ? { refreshToken: finalRefreshToken } : {}),
+        });
+
+        await fetch(`http://localhost:${port}/callback?${params}`, {
+          mode: "no-cors"
+        }).catch(() => {
+          // rare fallback if fetch fails
+          window.location.href = `http://localhost:${port}/callback?${params}`;
+        });
         
-        window.location.href = redirectUrl.toString();
+        setAuthSuccess(true);
       } catch (e) {
         setError("Invalid state parameter. Try again.");
       }
@@ -71,23 +82,43 @@ function CallbackHandler() {
     processAuth();
   }, [searchParams]);
 
-  const state = searchParams.get("state");
-
   if (error) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#080810", color: "#fff", fontFamily: "monospace", flexDirection: "column", gap: "8px" }}>
-        <p style={{ color: "#f87171" }}>Authentication failed: {error}</p>
-        <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>Close this window and try again.</p>
+      <div className="min-h-screen bg-[#080810] flex items-center justify-center p-4">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 text-center max-w-sm w-full backdrop-blur-xl">
+          <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <h2 className="text-white font-bold text-lg mb-2">Authentication Failed</h2>
+          <p className="text-red-400 text-sm mb-4">{error}</p>
+          <p className="text-white/40 text-xs">You can close this window and try again.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authSuccess) {
+    return (
+      <div className="relative min-h-screen bg-[#080810] flex flex-col items-center justify-center font-mono text-center px-4">
+        <h1 className="text-white text-lg sm:text-xl tracking-[0.2em] mb-4">
+          ✓ AUTHENTICATED
+        </h1>
+        <p className="text-[13px] text-white/40">
+          You can close this tab and return to the CLI.
+        </p>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#080810", color: "#fff", fontFamily: "monospace", flexDirection: "column", gap: "12px" }}>
-      <p style={{ color: "rgba(255,255,255,0.6)" }}>Completing authentication...</p>
-      <p style={{ color: "rgba(255,255,255,0.2)", fontSize: "12px" }}>
-        {state ? "Redirecting back to CLI..." : "Redirecting..."}
-      </p>
+    <div className="min-h-screen bg-[#080810] flex flex-col items-center justify-center gap-4 font-mono">
+      <div className="w-6 h-6 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
+      <div className="text-center">
+        <p className="text-white/80 text-sm mb-1">Completing authentication...</p>
+        <p className="text-white/40 text-xs">{isCLI ? "Connecting to terminal" : "Redirecting to dashboard"}</p>
+      </div>
     </div>
   );
 }
@@ -95,8 +126,8 @@ function CallbackHandler() {
 export default function AuthCallbackPage() {
   return (
     <Suspense fallback={
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#080810", color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
-        Loading...
+      <div className="min-h-screen bg-[#080810] flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
       </div>
     }>
       <CallbackHandler />

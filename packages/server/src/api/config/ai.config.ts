@@ -119,6 +119,12 @@ export const AI_CONFIG: AIConfig = {
         timeoutMs: 60_000,
         enabled: Boolean(process.env.OPENAI_API_KEY),
       },
+      {
+        name: "huggingface",
+        apiKey: process.env.HF_API_KEY,
+        timeoutMs: 60_000,
+        enabled: Boolean(process.env.HF_API_KEY),
+      },
     ],
 
     retry: {

@@ -17,7 +17,7 @@ ALTER TABLE "CodeChunk" ADD COLUMN "embedding" vector(1024);
 
 -- 3. Create HNSW index for efficient approximate nearest-neighbor search
 -- (pgvector >= 0.5.0 required)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "CodeChunk_embedding_hnsw_idx"
+CREATE INDEX IF NOT EXISTS "CodeChunk_embedding_hnsw_idx"
   ON "CodeChunk"
   USING hnsw ("embedding" vector_cosine_ops)
   WITH (m = 16, ef_construction = 64);

@@ -202,7 +202,6 @@ export async function sendMessage(
     system: getSystemPrompt(cwd, fullContext, pm.name),
     messages: [...history, currentUserMessage],
     tools: buildTools(cwd, sessionId),
-    // @ts-ignore
     stopWhen: stepCountIs(10),
     onFinish: async ({ text, steps, usage }) => {
       const finalContent =

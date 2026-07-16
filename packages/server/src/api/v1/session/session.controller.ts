@@ -8,6 +8,7 @@ import {
 } from "./session.service";
 import { CreateSessionSchema, UpdateSessionCwdSchema } from "./session.dto";
 import { AppError } from "../../../utils/AppError";
+import { getIndexingStatus } from "../../infra/embeddings/indexer.service";
 
 export async function getAll(
   req: Request,
@@ -75,6 +76,28 @@ export async function updateCwd(
 
     const session = await updateSessionCwd(req.params.id, userId, parsed.data.cwd);
     res.status(200).json({ success: true, data: session });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /session/:id/indexing-status
+ * Returns the current RAG indexing status for a session.
+ * Used by the web dashboard to poll until indexing is complete.
+ */
+export async function getIndexingStatusHandler(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = (req as unknown as AuthRequest).userId;
+    const session = await getSessionById(req.params.id, userId);
+    if (!session) return next(new AppError("Session not found", 404));
+
+    const status = await getIndexingStatus(req.params.id);
+    res.status(200).json({ success: true, data: { status } });
   } catch (err) {
     next(err);
   }
