@@ -13,12 +13,53 @@ export type OrchestratorResult = {
   summary: string;
 };
 
-const COMPLEXITY_THRESHOLD = 5;
+/**
+ * Score-based complexity detection.
+ *
+ * Each signal adds points. Only messages reaching COMPLEXITY_THRESHOLD
+ * are routed to the multi-agent pipeline, avoiding false positives on
+ * simple commands like "add a button" or "fix the typo".
+ *
+ * Signals:
+ *  +2  — multi-file scope words ("across", "all files", "throughout", "every file")
+ *  +2  — full-feature keywords ("implement", "scaffold", "migrate", "refactor", "integrate")
+ *  +1  — creation keywords ("create", "build", "setup", "add")
+ *  +1  — technical domain keywords (auth, middleware, database, payment, API, websocket, etc.)
+ *  +1  — message > 40 words (detailed request)
+ *  +1  — specific file path mentioned (e.g. "src/", ".ts", ".tsx")
+ *  +2  — AND conjunction indicating multi-step ("and then", "then", "after that", "followed by")
+ *
+ * Threshold: 4 points to trigger multi-agent.
+ */
+const COMPLEXITY_THRESHOLD = 4;
 
 export function detectComplexity(message: string): boolean {
-  const complexKeywords = /build|implement|create|add|setup|integrate|refactor|migrate|scaffold/i;
-  const wordCount = message.trim().split(/\s+/).length;
-  return complexKeywords.test(message) && wordCount >= COMPLEXITY_THRESHOLD;
+  const lower = message.toLowerCase();
+  const wordCount = lower.trim().split(/\s+/).length;
+  let score = 0;
+
+  // Multi-file scope
+  if (/\b(across|throughout|all files|every file|entire codebase|globally)\b/.test(lower)) score += 2;
+
+  // Full-feature keywords (high signal)
+  if (/\b(implement|scaffold|migrate|refactor|integrate|rewrite|redesign)\b/.test(lower)) score += 2;
+
+  // Creation keywords (medium signal — common but ambiguous alone)
+  if (/\b(create|build|setup|set up|add)\b/.test(lower)) score += 1;
+
+  // Technical domain keywords
+  if (/\b(auth(?:entication|orization)?|middleware|database|payment|api|websocket|webhook|cron|queue|worker|cache|redis|migration|schema)\b/.test(lower)) score += 1;
+
+  // Detailed request (long message)
+  if (wordCount > 40) score += 1;
+
+  // Specific file path mentioned
+  if (/\b(src\/|lib\/|api\/|\.ts\b|\.tsx\b|\.js\b)/.test(lower)) score += 1;
+
+  // Multi-step conjunction
+  if (/\b(and then|then|after that|followed by|also|additionally|furthermore)\b/.test(lower)) score += 2;
+
+  return score >= COMPLEXITY_THRESHOLD;
 }
 
 export async function runOrchestrator(

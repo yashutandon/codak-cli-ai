@@ -3,7 +3,7 @@ export type ModelPricing = {
     outputUsedMillionTokens: number;
 };
 
-export type SupportProvider = "anthropic" | "openai" | "google" | "groq";
+export type SupportProvider = "anthropic" | "openai" | "google" | "groq" | "huggingface";
 
 type SupportedChatModelDefinition = {
     id: string;
@@ -124,6 +124,22 @@ export const SUPPORTED_CHAT_MODELS = [
         displayName: "Qwen 3 32B",
         provider: "groq",
         contextWindow: 32_000,
+        pricing: { inputUsedMillionTokens: 0, outputUsedMillionTokens: 0 },
+    },
+
+    // HuggingFace (Serverless Inference)
+    {
+        id: "meta-llama/Meta-Llama-3-8B-Instruct",
+        displayName: "HF Llama 3 8B",
+        provider: "huggingface",
+        contextWindow: 8_192,
+        pricing: { inputUsedMillionTokens: 0, outputUsedMillionTokens: 0 },
+    },
+    {
+        id: "mistralai/Mixtral-8x7B-Instruct-v0.1",
+        displayName: "HF Mixtral 8x7B",
+        provider: "huggingface",
+        contextWindow: 32_768,
         pricing: { inputUsedMillionTokens: 0, outputUsedMillionTokens: 0 },
     },
 

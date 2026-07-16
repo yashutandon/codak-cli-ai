@@ -40,6 +40,7 @@ import { GeminiLLMProvider } from "../providers/llm/gemini.provider";
 import { OpenRouterLLMProvider } from "../providers/llm/openrouter.provider";
 import { GroqLLMProvider } from "../providers/llm/groq.provider";
 import { OpenAILLMProvider } from "../providers/llm/openai.provider";
+import { HuggingFaceLLMProvider } from "../providers/llm/huggingface.provider";
 
 // Gateway components
 import { HealthManager } from "./health.manager";
@@ -178,6 +179,7 @@ export class AIGateway {
       openrouter: () => new OpenRouterLLMProvider(get("openrouter").apiKey!, get("openrouter").timeoutMs),
       groq: () => new GroqLLMProvider(get("groq").apiKey!, get("groq").timeoutMs),
       openai: () => new OpenAILLMProvider(get("openai").timeoutMs),
+      huggingface: () => new HuggingFaceLLMProvider(get("huggingface").apiKey!, get("huggingface").timeoutMs),
     };
 
     return (cfg as ProviderConfig[])

@@ -1,6 +1,6 @@
 import { join } from "path";
 import { homedir } from "os";
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile, writeFile, mkdir, unlink } from "fs/promises";
 
 const CONFIG_DIR = join(homedir(), ".codak");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
@@ -50,6 +50,15 @@ export async function getRefreshToken(): Promise<string | null> {
   }
 }
 
+export async function getStoredConfig(): Promise<Partial<Config> | null> {
+  try {
+    const raw = await readFile(CONFIG_FILE, "utf-8");
+    return JSON.parse(raw) as Partial<Config>;
+  } catch {
+    return null;
+  }
+}
+
 export async function isAccessTokenExpired(): Promise<boolean> {
   try {
     const raw = await readFile(CONFIG_FILE, "utf-8");
@@ -62,10 +71,14 @@ export async function isAccessTokenExpired(): Promise<boolean> {
   }
 }
 
+/**
+ * Removes the stored config file entirely.
+ * Next call to getToken() will return null → CLI will prompt re-login.
+ */
 export async function clearToken(): Promise<void> {
   try {
-    await writeFile(CONFIG_FILE, JSON.stringify({}), "utf-8");
+    await unlink(CONFIG_FILE);
   } catch {
-    // ignore
+    // File already gone — that's fine
   }
 }
