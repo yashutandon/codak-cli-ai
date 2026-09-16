@@ -120,10 +120,10 @@ export const SUPPORTED_CHAT_MODELS = [
         pricing: { inputUsedMillionTokens: 0, outputUsedMillionTokens: 0 },
     },
     {
-        id: "qwen/qwen3-32b",
-        displayName: "Qwen 3 32B",
+        id: "qwen/qwen3.8-27b",
+        displayName: "Qwen 3.8 27B",
         provider: "groq",
-        contextWindow: 32_000,
+        contextWindow: 200_000,
         pricing: { inputUsedMillionTokens: 0, outputUsedMillionTokens: 0 },
     },
 

@@ -35,3 +35,62 @@ export interface SessionDto {
   createdAt: string;
   messages: Message[];
 }
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string | null;
+  tier: "FREE" | "PRO" | "ENTERPRISE";
+  isOAuthUser: boolean;
+  createdAt: string;
+}
+
+export interface UsageStats {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cost: number;
+}
+
+export interface DailyUsage {
+  date: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cost: number;
+}
+
+export interface SessionUsage {
+  sessionId: string;
+  title: string;
+  totalTokens: number;
+  cost: number;
+  lastUsed: string;
+}
+
+export interface RecentUsageItem {
+  id: string;
+  sessionId: string | null;
+  sessionTitle: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cost: number;
+  createdAt: string;
+}
+
+export interface UsageHistoryResponse {
+  daily: DailyUsage[];
+  sessions: SessionUsage[];
+  recent: RecentUsageItem[];
+}
+
+export interface SubscriptionResponse {
+  id: string;
+  entity: string;
+  status: string;
+  plan_id: string;
+  customer_id?: string;
+  mock?: boolean;
+}
+

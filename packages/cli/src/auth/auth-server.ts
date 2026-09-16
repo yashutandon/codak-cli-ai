@@ -5,9 +5,29 @@ export interface AuthTokens {
   refreshToken: string;
 }
 
-export function waitForToken(port: number): Promise<AuthTokens> {
-  return new Promise((resolve, reject) => {
+export interface RunningAuthServer {
+  port: number;
+  waitForToken: () => Promise<AuthTokens>;
+}
+
+/**
+ * Starts an ephemeral local HTTP server to receive the OAuth callback.
+ * Using port 0 allows the operating system to safely allocate any available,
+ * non-excluded port, avoiding Windows Hyper-V / WSL port exclusion conflicts (EADDRINUSE).
+ */
+export function startAuthServer(): Promise<RunningAuthServer> {
+  return new Promise((resolveStart, rejectStart) => {
+    let tokenResolve: (tokens: AuthTokens) => void;
+    let tokenReject: (err: Error) => void;
+
+    const tokenPromise = new Promise<AuthTokens>((res, rej) => {
+      tokenResolve = res;
+      tokenReject = rej;
+    });
+
     const server = createServer((req, res) => {
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
       const url = new URL(req.url ?? "/", `http://localhost:${port}`);
 
       if (url.pathname !== "/callback") {
@@ -22,7 +42,7 @@ export function waitForToken(port: number): Promise<AuthTokens> {
       if (!accessToken) {
         res.writeHead(400);
         res.end("Missing token");
-        reject(new Error("No token received"));
+        tokenReject(new Error("No token received"));
         server.close();
         return;
       }
@@ -46,21 +66,39 @@ export function waitForToken(port: number): Promise<AuthTokens> {
         </html>
       `);
 
-      resolve({ accessToken, refreshToken: refreshToken ?? "" });
+      tokenResolve({ accessToken, refreshToken: refreshToken ?? "" });
       server.close();
     });
-
-    server.listen(port, "localhost", () => {});
 
     server.on("error", (err) => {
-      reject(err);
+      rejectStart(err);
+      if (tokenReject) tokenReject(err);
     });
 
-    setTimeout(() => {
-      server.close();
-      reject(new Error("Auth timeout — no response within 5 minutes"));
-    }, 5 * 60 * 1000);
+    // Port 0 tells the OS to assign an available ephemeral port
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+
+      const timeout = setTimeout(() => {
+        server.close();
+        tokenReject(new Error("Auth timeout — no response within 5 minutes"));
+      }, 5 * 60 * 1000);
+
+      resolveStart({
+        port,
+        waitForToken: () => tokenPromise.finally(() => clearTimeout(timeout)),
+      });
+    });
   });
+}
+
+/**
+ * Backward-compatible helper that starts the server and waits for the token.
+ */
+export async function waitForToken(port?: number): Promise<AuthTokens> {
+  const authServer = await startAuthServer();
+  return authServer.waitForToken();
 }
 
 export function getRandomPort(): number {

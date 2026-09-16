@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
-import { registerHandler, loginHandler, refreshHandler, logoutHandler, exchangeOAuthCodeHandler } from "./auth.controller";
+import { registerHandler, loginHandler, refreshHandler, logoutHandler, exchangeOAuthCodeHandler, meHandler } from "./auth.controller";
 import {
   githubInit,
   githubCallback,
   googleInit,
   googleCallback,
 } from "././oauth/oauth.controller";
+import { authenticate } from "../../middleware/auth.middleware";
 
 const authRouter = Router();
 
@@ -54,6 +55,7 @@ authRouter.post("/login",         loginLimiter,    loginHandler);
 authRouter.post("/refresh",       refreshLimiter,  refreshHandler);
 authRouter.post("/logout",                         logoutHandler);
 authRouter.post("/exchange-code", refreshLimiter,  exchangeOAuthCodeHandler);
+authRouter.get("/me",             authenticate,    meHandler);
 
 // ─── GitHub OAuth ──────────────────────────────────────────────
 authRouter.get("/github",          oauthLimiter, githubInit);

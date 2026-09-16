@@ -2,6 +2,7 @@ import { Router } from "express";
 import sessionRouter from "./session/session.routes";
 import authRouter from "./auth/auth.router";
 import { authenticate } from "../middleware/auth.middleware";
+import { messageLimiter } from "../../middleware/rate-limit.middleware";
 import messageRouter from "./message/message.router";
 import healthRouter from "./health/health.routes";
 import paymentRouter from "./payment/payment.router";
@@ -12,7 +13,9 @@ const v1Router = Router();
 v1Router.use("/health", healthRouter);
 v1Router.use("/auth", authRouter);
 v1Router.use("/sessions", authenticate, sessionRouter);
-v1Router.use("/sessions/:id/messages", authenticate, messageRouter);
+v1Router.use("/session", authenticate, sessionRouter);
+v1Router.use("/sessions/:id/messages", authenticate, messageLimiter, messageRouter);
+v1Router.use("/message/:id", authenticate, messageLimiter, messageRouter);
 v1Router.use("/payments", paymentRouter);
 v1Router.use("/usage", authenticate, usageRouter);
 

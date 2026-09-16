@@ -75,4 +75,36 @@ describe("Usage API", () => {
     expect(res.body.data.cost).toBe(0.0125);
     expect(prismaMock.usageToken.aggregate).toHaveBeenCalledOnce();
   });
+
+  it("should get usage history with daily buckets", async () => {
+    const userId = "test_user_3";
+    const token = generateToken(userId);
+
+    prismaMock.usageToken.findMany.mockResolvedValue([
+      {
+        id: "ut_1",
+        userId,
+        sessionId: "sess_1",
+        promptTokens: 200,
+        completionTokens: 100,
+        totalTokens: 300,
+        cost: 0.005,
+        createdAt: new Date(),
+        session: { id: "sess_1", title: "My Session" },
+      },
+    ] as any);
+
+    const res = await request(app)
+      .get("/api/v1/usage/history")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.daily).toHaveLength(30);
+    expect(res.body.data.sessions).toHaveLength(1);
+    expect(res.body.data.sessions[0].title).toBe("My Session");
+    expect(res.body.data.recent).toHaveLength(1);
+    expect(prismaMock.usageToken.findMany).toHaveBeenCalledOnce();
+  });
 });
+
