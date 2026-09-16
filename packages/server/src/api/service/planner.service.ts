@@ -60,11 +60,19 @@ RULES:
   return text;
 }
 
+/**
+ * Multi-Agent Pipeline: Orchestrator → CodingAgent (with tools) → ReviewAgent → Feedback Loop
+ * 
+ * For complex tasks, the orchestrator breaks the request into sub-tasks.
+ * Each coding task is executed with full tool access, then reviewed.
+ * If the review agent requests changes, the coding agent gets one retry with feedback.
+ */
 export async function runMultiAgent(
   userMessage: string,
   cwd: string,
   ragContext: string,
   modelId: string,
+  sessionId: string,
   history: { role: "user" | "assistant"; content: string }[],
   images?: string[]
 ): Promise<string> {
@@ -77,6 +85,7 @@ export async function runMultiAgent(
         ],
       }
     : { role: "user" as const, content: userMessage };
+
   // Step 1: Orchestrator — task breakdown
   const orchestration = await runOrchestrator(
     userMessage, cwd, ragContext, modelId
@@ -92,21 +101,73 @@ export async function runMultiAgent(
     return text;
   }
 
-  // Step 2: Run coding agent for each task
+  // Step 2: Run coding agent for each task, with review loop
   const results: string[] = [];
 
   for (const task of orchestration.tasks) {
     if (task.type === "code") {
-      const code = await runCodingAgent(task, cwd, ragContext, modelId, history);
+      // Run CodingAgent with full tool access
+      let code = await runCodingAgent(task, cwd, ragContext, modelId, sessionId, history);
 
-      // Step 3: Review agent
-      const review = await runReviewAgent(code, cwd, modelId);
-      const approved = review.includes("APPROVE");
+      // Run ReviewAgent with read-only tool access
+      const review = await runReviewAgent(
+        task.description,
+        task.filePaths,
+        cwd,
+        ragContext,
+        modelId,
+        sessionId,
+      );
 
-      results.push(`### ${task.description}\n${code}${!approved ? `\n\n**Review:**\n${review}` : ""}`);
+      if (review.verdict === "REQUEST_CHANGES" && review.issues.length > 0) {
+        // Feedback loop: give the CodingAgent one chance to fix
+        const feedbackTask = {
+          ...task,
+          description: `${task.description}\n\n⚠️ REVIEW FEEDBACK — Fix these issues:\n${review.issues.map((i, idx) => `${idx + 1}. ${i}`).join("\n")}`,
+        };
+
+        code = await runCodingAgent(feedbackTask, cwd, ragContext, modelId, sessionId, [
+          ...history,
+          { role: "assistant", content: code },
+          { role: "user", content: `The review agent found issues. Please fix them:\n${review.issues.join("\n")}` },
+        ]);
+
+        // Second review (final, no more retries)
+        const finalReview = await runReviewAgent(
+          task.description,
+          task.filePaths,
+          cwd,
+          ragContext,
+          modelId,
+          sessionId,
+        );
+
+        results.push(
+          `### ${task.description}\n${code}\n\n**Review:** ${finalReview.verdict}\n${finalReview.issues.length > 0 ? finalReview.issues.map(i => `- ${i}`).join("\n") : "✅ No issues found"}`
+        );
+      } else {
+        results.push(`### ${task.description}\n${code}\n\n**Review:** ✅ ${review.summary}`);
+      }
+
     } else if (task.type === "review") {
-      const review = await runReviewAgent(task.description, cwd, modelId);
-      results.push(`### Review\n${review}`);
+      const review = await runReviewAgent(
+        task.description,
+        task.filePaths,
+        cwd,
+        ragContext,
+        modelId,
+        sessionId,
+      );
+      results.push(`### Review: ${task.description}\n**Verdict:** ${review.verdict}\n${review.issues.map(i => `- ${i}`).join("\n") || "✅ No issues"}`);
+
+    } else if (task.type === "explain" || task.type === "test") {
+      // For explain/test tasks, use simple generateText
+      const { text } = await generateText({
+        model: getModel(modelId),
+        system: `You are Codak, an AI coding assistant.\nWorking directory: ${cwd}\n${ragContext}`,
+        messages: [...history, { role: "user", content: task.description }],
+      });
+      results.push(`### ${task.description}\n${text}`);
     }
   }
 

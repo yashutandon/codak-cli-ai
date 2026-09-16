@@ -3,7 +3,14 @@
  * All calls include Authorization: Bearer <token> from localStorage.
  */
 
-import type { SessionDto, Message } from "../types/api";
+import type {
+  SessionDto,
+  Message,
+  UserProfile,
+  UsageStats,
+  UsageHistoryResponse,
+  SubscriptionResponse,
+} from "../types/api";
 import { getAccessToken } from "./auth";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -139,3 +146,28 @@ export async function* sendMessageStream(
     }
   }
 }
+
+// ── User & Auth ───────────────────────────────────────────────────────────────
+
+export async function getUserProfile(): Promise<UserProfile> {
+  return apiFetch<UserProfile>("/api/v1/auth/me");
+}
+
+// ── Usage & Analytics ─────────────────────────────────────────────────────────
+
+export async function getUsageStats(): Promise<UsageStats> {
+  return apiFetch<UsageStats>("/api/v1/usage/stats");
+}
+
+export async function getUsageHistory(): Promise<UsageHistoryResponse> {
+  return apiFetch<UsageHistoryResponse>("/api/v1/usage/history");
+}
+
+// ── Payments & Billing ────────────────────────────────────────────────────────
+
+export async function createSubscription(): Promise<SubscriptionResponse> {
+  return apiFetch<SubscriptionResponse>("/api/v1/payments/create-subscription", {
+    method: "POST",
+  });
+}
+

@@ -95,4 +95,82 @@ usageRouter.get("/stats", async (req, res) => {
   }
 });
 
+usageRouter.get("/history", async (req, res) => {
+  try {
+    const userId = (req as unknown as AuthRequest).userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: { message: "Unauthorized" } });
+    }
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const records = await db.usageToken.findMany({
+      where: {
+        userId,
+        createdAt: { gte: thirtyDaysAgo },
+      },
+      include: {
+        session: {
+          select: { id: true, title: true },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Build last 30 daily buckets
+    const dailyMap = new Map<string, { date: string; promptTokens: number; completionTokens: number; totalTokens: number; cost: number }>();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      dailyMap.set(key, { date: key, promptTokens: 0, completionTokens: 0, totalTokens: 0, cost: 0 });
+    }
+
+    // Build per-session summaries
+    const sessionMap = new Map<string, { sessionId: string; title: string; totalTokens: number; cost: number; lastUsed: string }>();
+
+    for (const r of records) {
+      const dayKey = r.createdAt.toISOString().slice(0, 10);
+      const day = dailyMap.get(dayKey);
+      if (day) {
+        day.promptTokens += r.promptTokens;
+        day.completionTokens += r.completionTokens;
+        day.totalTokens += r.totalTokens;
+        day.cost += r.cost ?? 0;
+      }
+
+      const sid = r.sessionId ?? "adhoc";
+      const title = r.session?.title ?? "Direct Request";
+      const prev = sessionMap.get(sid) ?? { sessionId: sid, title, totalTokens: 0, cost: 0, lastUsed: r.createdAt.toISOString() };
+      prev.totalTokens += r.totalTokens;
+      prev.cost += r.cost ?? 0;
+      prev.lastUsed = r.createdAt.toISOString();
+      sessionMap.set(sid, prev);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        daily: Array.from(dailyMap.values()),
+        sessions: Array.from(sessionMap.values()),
+        recent: records.slice(-30).reverse().map((r) => ({
+          id: r.id,
+          sessionId: r.sessionId,
+          sessionTitle: r.session?.title ?? "Direct Request",
+          promptTokens: r.promptTokens,
+          completionTokens: r.completionTokens,
+          totalTokens: r.totalTokens,
+          cost: r.cost ?? 0,
+          createdAt: r.createdAt.toISOString(),
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Usage history error:", error);
+    res.status(500).json({ success: false, error: { message: "Internal server error" } });
+  }
+});
+
 export default usageRouter;

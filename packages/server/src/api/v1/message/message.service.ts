@@ -164,12 +164,11 @@ export async function sendMessage(
   }
 
   // ─── BUILD mode — complex task (multi-agent) ───────────────────
-  // TODO: Refactor multi-agent to use tools properly. For now, route all 
-  // queries to the main streamText pipeline so tools can be executed.
-  const isComplex = false; // detectComplexity(data.content);
+  // Multi-agent pipeline for complex tasks
+  const isComplex = detectComplexity(data.content);
 
   if (isComplex) {
-    const result = await runMultiAgent(data.content, cwd, fullContext, data.model, history, data.images);
+    const result = await runMultiAgent(data.content, cwd, fullContext, data.model, sessionId, history, data.images);
 
     await db.message.create({
       data: {

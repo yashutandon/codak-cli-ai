@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { register, login, refreshAccessToken, revokeRefreshToken } from "./auth.service";
+import { db } from "@codak/database";
 import { RegisterSchema, LoginSchema } from "./auth.dto";
 import { AppError } from "../../../utils/AppError";
 import { redis } from "../../infra/redis/redis";
@@ -99,6 +100,38 @@ export async function exchangeOAuthCodeHandler(
 
     const tokens = JSON.parse(raw) as { accessToken: string; refreshToken: string };
     res.status(200).json({ success: true, data: tokens });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /auth/me
+ * Returns the authenticated user's profile.
+ */
+export async function meHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = (req as any).userId;
+
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        tier: true,
+        isOAuthUser: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) return next(new AppError("User not found", 404));
+
+    res.status(200).json({ success: true, data: user });
   } catch (err) {
     next(err);
   }

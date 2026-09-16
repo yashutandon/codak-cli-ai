@@ -1,4 +1,5 @@
 import { resolve } from "path";
+import { tools as knownTools } from "@codak/shared";
 
 type FirewallResult =
   | { allowed: true }
@@ -54,6 +55,10 @@ export function validateToolCall(
   args: Record<string, unknown>,
   cwd?: string
 ): FirewallResult {
+  if (!(toolName in knownTools)) {
+    return { allowed: false, reason: `Unknown tool: ${toolName}` };
+  }
+
   // run_command — command string check
   if (toolName === "run_command") {
     const command = String(args.command ?? "");

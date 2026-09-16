@@ -6,7 +6,7 @@ export const ModeSchema = z.enum(["BUILD", "PLAN"]);
 export const MessageStatusSchema = z.enum(["COMPLETE", "INTERRUPTED"]);
 
 export const CreateSessionSchema = z.object({
-  title: z.string(),
+  title: z.string().min(1, "Title cannot be empty"),
   cwd: z.string().optional(),
   intialMessage: z.object({
     role: RoleSchema,
